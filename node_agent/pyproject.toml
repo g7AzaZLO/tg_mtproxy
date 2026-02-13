@@ -1,0 +1,13 @@
+[project]
+name = "mtproxy-node-agent"
+version = "0.1.0"
+description = "Легковесный API-агент для управления mtprotoproxy на ноде"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.34",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

@@ -1,0 +1,22 @@
+[Unit]
+Description=MTProxy Node Agent
+After=network.target
+
+[Service]
+Type=simple
+User=mtproxy
+Group=mtproxy
+WorkingDirectory=/opt/node_agent
+EnvironmentFile=/opt/node_agent/.env
+ExecStart=/opt/node_agent/.venv/bin/uvicorn node_agent.agent:app --host 127.0.0.1 --port 9090
+Restart=always
+RestartSec=5
+
+# Лимиты
+LimitNOFILE=65535
+
+# Безопасность
+NoNewPrivileges=yes
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,26 @@
+[Unit]
+Description=MTProxy Telegram Bot + Web API
+After=network.target postgresql.service
+Wants=postgresql.service
+
+[Service]
+Type=simple
+User=mtproxy
+Group=mtproxy
+WorkingDirectory=/opt/tg_mtproxy
+EnvironmentFile=/opt/tg_mtproxy/.env
+ExecStart=/opt/tg_mtproxy/.venv/bin/python -m src.main
+Restart=always
+RestartSec=5
+
+# Лимиты
+LimitNOFILE=65535
+
+# Безопасность
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/opt/tg_mtproxy
+
+[Install]
+WantedBy=multi-user.target
