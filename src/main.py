@@ -18,6 +18,7 @@ from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 
 from src.bot.handlers import admin, buy, my_proxies, start
+from src.bot.handlers.admin import set_admin_ids
 from src.bot.middlewares.throttle import BanCheckMiddleware, ThrottleMiddleware, UserMiddleware
 from src.config import get_settings
 from src.db.pool import close_pool, init_pool
@@ -42,6 +43,10 @@ async def main() -> None:
     # === Инициализация БД ===
     await init_pool(settings.db)
     logger.info("БД подключена")
+
+    # === Админы бота ===
+    set_admin_ids(settings.service.admin_ids_set)
+    logger.info("Админы бота: %s", settings.service.admin_ids_set)
 
     # === Сервисы ===
     node_manager = NodeManagerService()

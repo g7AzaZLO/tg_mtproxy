@@ -91,11 +91,22 @@ class ServiceSettings(BaseSettings):
 
     model_config = SettingsConfigDict(env_file=_ENV_FILE, extra="ignore")
 
+    admin_ids: str = Field(
+        default="",
+        description="Telegram ID администраторов через запятую",
+    )
     trial_duration_days: int = Field(default=2, description="Длительность пробного периода")
     notify_before_days: str = Field(
         default="3,1",
         description="Дни до окончания подписки для отправки напоминаний (через запятую)",
     )
+
+    @property
+    def admin_ids_set(self) -> set[int]:
+        """Множество Telegram ID администраторов."""
+        if not self.admin_ids.strip():
+            return set()
+        return {int(x.strip()) for x in self.admin_ids.split(",") if x.strip()}
 
     @property
     def notify_days_list(self) -> list[int]:
