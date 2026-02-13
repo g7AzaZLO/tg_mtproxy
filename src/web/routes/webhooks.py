@@ -6,15 +6,19 @@ CryptoCloud отправляет POST с x-www-form-urlencoded данными:
 - amount_crypto: сумма в крипте
 - currency: код криптовалюты
 - order_id: наш payment.id
-- token: JWT-подпись ответа (HS256, валидна 5 минут)
+- token: JWT подписанный SECRET KEY проекта (HS256, валиден 5 минут)
+
+Верификация: декодируем JWT с помощью SECRET KEY из настроек CryptoCloud.
+Если подпись невалидна или токен истёк — отклоняем запрос.
 """
 
 import logging
 
-from fastapi import APIRouter, Form, Request
+import jwt
+from fastapi import APIRouter, Form, HTTPException, Request, status
 
+from src.config import Settings
 from src.db import repositories as repo
-from src.services.node_manager import NodeManagerService
 from src.services.proxy import format_proxy_message
 from src.services.subscription import SubscriptionService
 
@@ -23,10 +27,31 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+def _verify_cryptocloud_token(token: str, secret_key: str) -> dict | None:
+    """Верифицирует JWT-токен из postback CryptoCloud.
+
+    Args:
+        token: JWT-строка из поля token postback-а.
+        secret_key: SECRET KEY проекта из настроек CryptoCloud.
+
+    Returns:
+        Payload токена при успешной верификации, None при ошибке.
+    """
+    try:
+        payload = jwt.decode(token, secret_key, algorithms=["HS256"])
+        return payload
+    except jwt.ExpiredSignatureError:
+        logger.warning("CryptoCloud postback: JWT токен истёк")
+        return None
+    except jwt.InvalidTokenError as exc:
+        logger.warning("CryptoCloud postback: невалидный JWT токен: %s", exc)
+        return None
+
+
 @router.post("/cryptocloud")
 async def cryptocloud_postback(
     request: Request,
-    status: str = Form(...),
+    status_field: str = Form(alias="status"),
     invoice_id: str = Form(default=""),
     amount_crypto: str = Form(default=""),
     currency: str = Form(default=""),
@@ -36,33 +61,56 @@ async def cryptocloud_postback(
     """Обрабатывает postback от CryptoCloud при успешной оплате.
 
     Пайплайн:
-    1. Находим payment по order_id
-    2. Обновляем статус на success
-    3. Активируем подписку (генерация секрета, добавление на ноду)
-    4. Обновляем статус на paid
-    5. Уведомляем пользователя через бота
+    1. Верифицируем JWT-подпись postback-а
+    2. Находим payment по order_id
+    3. Обновляем статус на success
+    4. Активируем подписку (генерация секрета, добавление на ноду)
+    5. Обновляем статус на paid
+    6. Уведомляем пользователя через бота
 
     Args:
         request: Объект FastAPI Request (содержит app.state со ссылками на сервисы).
-        status: Статус платежа от CryptoCloud (ожидаем "success").
+        status_field: Статус платежа от CryptoCloud (ожидаем "success").
         invoice_id: ID инвойса в CryptoCloud.
         amount_crypto: Сумма в криптовалюте.
         currency: Код криптовалюты.
         order_id: Наш payment.id.
-        token: JWT-подпись.
+        token: JWT-подпись (HS256, подписана SECRET KEY проекта).
 
     Returns:
         Словарь с результатом обработки.
+
+    Raises:
+        HTTPException: 403 при невалидной подписи JWT.
     """
     logger.info(
         "CryptoCloud postback: status=%s, invoice_id=%s, order_id=%s",
-        status,
+        status_field,
         invoice_id,
         order_id,
     )
 
-    if status != "success":
-        logger.warning("Неожиданный статус postback: %s", status)
+    # === Верификация подписи ===
+    settings: Settings = request.app.state.settings
+    if not token:
+        logger.error("CryptoCloud postback: JWT токен отсутствует")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Missing token",
+        )
+
+    payload = _verify_cryptocloud_token(token, settings.cryptocloud.secret_key)
+    if payload is None:
+        logger.error("CryptoCloud postback: верификация JWT провалена")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Invalid token",
+        )
+
+    logger.info("CryptoCloud JWT верифицирован: %s", payload)
+
+    if status_field != "success":
+        logger.warning("Неожиданный статус postback: %s", status_field)
         return {"ok": True}
 
     # Находим платёж

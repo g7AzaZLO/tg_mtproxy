@@ -41,6 +41,9 @@ class CryptoCloudSettings(BaseSettings):
 
     api_key: str = Field(description="API-ключ CryptoCloud")
     shop_id: str = Field(description="Идентификатор магазина в CryptoCloud")
+    secret_key: str = Field(
+        description="SECRET KEY проекта CryptoCloud (для верификации JWT в postback)"
+    )
     base_url: str = Field(
         default="https://api.cryptocloud.plus/v2",
         description="Базовый URL API CryptoCloud",
