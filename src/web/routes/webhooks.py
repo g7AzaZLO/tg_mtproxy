@@ -110,7 +110,7 @@ async def cryptocloud_postback(request: Request) -> dict:
         status,
         invoice_id,
         order_id,
-        list(form_data.keys()),
+        list(data.keys()),
     )
 
     # === Верификация подписи ===
