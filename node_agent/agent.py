@@ -14,7 +14,7 @@ from fastapi import Depends, FastAPI, HTTPException, Security, status
 from fastapi.security import APIKeyHeader
 from pydantic import BaseModel
 
-from node_agent.config_manager import ConfigManager
+from config_manager import ConfigManager
 
 logging.basicConfig(
     level=logging.INFO,
