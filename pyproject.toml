@@ -13,6 +13,7 @@ dependencies = [
     "apscheduler>=3.11",
     "pyjwt>=2.10",
     "passlib[bcrypt]>=1.7",
+    "python-multipart>=0.0.18",
 ]
 
 [project.optional-dependencies]
