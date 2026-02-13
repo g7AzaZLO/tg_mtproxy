@@ -15,7 +15,8 @@ CryptoCloud отправляет POST с x-www-form-urlencoded данными:
 import logging
 
 import jwt
-from fastapi import APIRouter, Form, HTTPException, Request, status
+from fastapi import APIRouter, Form, HTTPException, Request
+from starlette import status as http_status
 
 from src.config import Settings
 from src.db import repositories as repo
@@ -51,7 +52,7 @@ def _verify_cryptocloud_token(token: str, secret_key: str) -> dict | None:
 @router.post("/cryptocloud")
 async def cryptocloud_postback(
     request: Request,
-    status_field: str = Form(alias="status"),
+    status: str = Form(...),
     invoice_id: str = Form(default=""),
     amount_crypto: str = Form(default=""),
     currency: str = Form(default=""),
@@ -70,7 +71,7 @@ async def cryptocloud_postback(
 
     Args:
         request: Объект FastAPI Request (содержит app.state со ссылками на сервисы).
-        status_field: Статус платежа от CryptoCloud (ожидаем "success").
+        status: Статус платежа от CryptoCloud (ожидаем "success").
         invoice_id: ID инвойса в CryptoCloud.
         amount_crypto: Сумма в криптовалюте.
         currency: Код криптовалюты.
@@ -85,7 +86,7 @@ async def cryptocloud_postback(
     """
     logger.info(
         "CryptoCloud postback: status=%s, invoice_id=%s, order_id=%s",
-        status_field,
+        status,
         invoice_id,
         order_id,
     )
@@ -95,7 +96,7 @@ async def cryptocloud_postback(
     if not token:
         logger.error("CryptoCloud postback: JWT токен отсутствует")
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
+            status_code=http_status.HTTP_403_FORBIDDEN,
             detail="Missing token",
         )
 
@@ -103,14 +104,14 @@ async def cryptocloud_postback(
     if payload is None:
         logger.error("CryptoCloud postback: верификация JWT провалена")
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
+            status_code=http_status.HTTP_403_FORBIDDEN,
             detail="Invalid token",
         )
 
     logger.info("CryptoCloud JWT верифицирован: %s", payload)
 
-    if status_field != "success":
-        logger.warning("Неожиданный статус postback: %s", status_field)
+    if status != "success":
+        logger.warning("Неожиданный статус postback: %s", status)
         return {"ok": True}
 
     # Находим платёж
