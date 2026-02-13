@@ -1,6 +1,6 @@
 """Хэндлер команды /start и возврата в главное меню."""
 
-from aiogram import Router
+from aiogram import F, Router
 from aiogram.filters import CommandStart
 from aiogram.types import CallbackQuery, Message
 
@@ -32,7 +32,7 @@ async def cmd_start(message: Message, db_user: dict) -> None:
     )
 
 
-@router.callback_query(BackCallback.filter(lambda cb: cb.to == "main"))
+@router.callback_query(BackCallback.filter(F.to == "main"))
 async def back_to_main(callback: CallbackQuery) -> None:
     """Возврат в главное меню по кнопке «Назад».
 

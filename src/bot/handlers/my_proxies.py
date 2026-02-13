@@ -1,6 +1,6 @@
 """Хэндлер раздела «Мои прокси» — просмотр активных подписок."""
 
-from aiogram import Router
+from aiogram import F, Router
 from aiogram.types import CallbackQuery
 
 from src.bot.callbacks.factories import MyProxiesCallback
@@ -10,7 +10,7 @@ from src.services.subscription import SubscriptionService
 router = Router(name="my_proxies")
 
 
-@router.callback_query(MyProxiesCallback.filter(lambda cb: cb.action == "list"))
+@router.callback_query(MyProxiesCallback.filter(F.action == "list"))
 async def list_proxies(
     callback: CallbackQuery,
     db_user: dict,

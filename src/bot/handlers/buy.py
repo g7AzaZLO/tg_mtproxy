@@ -50,7 +50,7 @@ async def start_purchase(callback: CallbackQuery) -> None:
     await callback.answer()
 
 
-@router.callback_query(BackCallback.filter(lambda cb: cb.to == "locations"))
+@router.callback_query(BackCallback.filter(F.to == "locations"))
 async def back_to_locations(callback: CallbackQuery) -> None:
     """Возврат к выбору локации.
 
