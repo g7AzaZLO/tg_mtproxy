@@ -1,16 +1,20 @@
 """Конфигурация приложения через переменные окружения.
 
 Все настройки загружаются из .env файла с помощью pydantic-settings.
+Каждый вложенный класс настроек явно указывает env_file=".env",
+так как pydantic-settings v2 не пробрасывает это от родителя.
 """
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+_ENV_FILE = ".env"
+
 
 class BotSettings(BaseSettings):
     """Настройки Telegram-бота."""
 
-    model_config = SettingsConfigDict(env_prefix="BOT_")
+    model_config = SettingsConfigDict(env_file=_ENV_FILE, env_prefix="BOT_", extra="ignore")
 
     token: str = Field(description="Токен Telegram-бота от @BotFather")
 
@@ -18,7 +22,7 @@ class BotSettings(BaseSettings):
 class DatabaseSettings(BaseSettings):
     """Настройки подключения к PostgreSQL."""
 
-    model_config = SettingsConfigDict(env_prefix="DB_")
+    model_config = SettingsConfigDict(env_file=_ENV_FILE, env_prefix="DB_", extra="ignore")
 
     host: str = Field(default="localhost", description="Хост PostgreSQL")
     port: int = Field(default=5432, description="Порт PostgreSQL")
@@ -37,7 +41,9 @@ class DatabaseSettings(BaseSettings):
 class CryptoCloudSettings(BaseSettings):
     """Настройки платёжной системы CryptoCloud."""
 
-    model_config = SettingsConfigDict(env_prefix="CRYPTOCLOUD_")
+    model_config = SettingsConfigDict(
+        env_file=_ENV_FILE, env_prefix="CRYPTOCLOUD_", extra="ignore"
+    )
 
     api_key: str = Field(description="API-ключ CryptoCloud")
     shop_id: str = Field(description="Идентификатор магазина в CryptoCloud")
@@ -54,7 +60,7 @@ class CryptoCloudSettings(BaseSettings):
 class WebSettings(BaseSettings):
     """Настройки веб-сервера (FastAPI)."""
 
-    model_config = SettingsConfigDict(env_prefix="WEB_")
+    model_config = SettingsConfigDict(env_file=_ENV_FILE, env_prefix="WEB_", extra="ignore")
 
     host: str = Field(default="0.0.0.0", description="Хост веб-сервера")
     port: int = Field(default=8080, description="Порт веб-сервера")
@@ -64,7 +70,7 @@ class WebSettings(BaseSettings):
 class AdminSettings(BaseSettings):
     """Настройки админ-панели."""
 
-    model_config = SettingsConfigDict(env_prefix="ADMIN_")
+    model_config = SettingsConfigDict(env_file=_ENV_FILE, env_prefix="ADMIN_", extra="ignore")
 
     username: str = Field(default="admin", description="Логин администратора")
     password: str = Field(description="Пароль администратора")
@@ -73,7 +79,7 @@ class AdminSettings(BaseSettings):
 class JWTSettings(BaseSettings):
     """Настройки JWT-токенов."""
 
-    model_config = SettingsConfigDict(env_prefix="JWT_")
+    model_config = SettingsConfigDict(env_file=_ENV_FILE, env_prefix="JWT_", extra="ignore")
 
     secret: str = Field(description="Секретный ключ для подписи JWT")
     algorithm: str = Field(default="HS256", description="Алгоритм подписи JWT")
@@ -82,6 +88,8 @@ class JWTSettings(BaseSettings):
 
 class ServiceSettings(BaseSettings):
     """Настройки бизнес-логики сервиса."""
+
+    model_config = SettingsConfigDict(env_file=_ENV_FILE, extra="ignore")
 
     trial_duration_days: int = Field(default=2, description="Длительность пробного периода")
     notify_before_days: str = Field(
@@ -99,7 +107,7 @@ class Settings(BaseSettings):
     """Корневой объект конфигурации, объединяющий все настройки."""
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=_ENV_FILE,
         env_file_encoding="utf-8",
         extra="ignore",
     )
