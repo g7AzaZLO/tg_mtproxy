@@ -1,21 +1,16 @@
 """Webhook-эндпоинт для обработки postback от CryptoCloud.
 
-CryptoCloud отправляет POST с x-www-form-urlencoded данными:
-- status: "success"
-- invoice_id: идентификатор платежа CryptoCloud
-- amount_crypto: сумма в крипте
-- currency: код криптовалюты
-- order_id: наш payment.id
-- token: JWT подписанный SECRET KEY проекта (HS256, валиден 5 минут)
+CryptoCloud отправляет POST с x-www-form-urlencoded данными.
+Данные парсятся из request.form() без строгой валидации,
+так как CryptoCloud может присылать дополнительные поля.
 
-Верификация: декодируем JWT с помощью SECRET KEY из настроек CryptoCloud.
-Если подпись невалидна или токен истёк — отклоняем запрос.
+Верификация: декодируем JWT из поля token с помощью SECRET KEY.
 """
 
 import logging
 
 import jwt
-from fastapi import APIRouter, Form, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request
 from starlette import status as http_status
 
 from src.config import Settings
@@ -49,34 +44,53 @@ def _verify_cryptocloud_token(token: str, secret_key: str) -> dict | None:
         return None
 
 
-@router.post("/cryptocloud")
-async def cryptocloud_postback(
-    request: Request,
-    status: str = Form(...),
-    invoice_id: str = Form(default=""),
-    amount_crypto: str = Form(default=""),
-    currency: str = Form(default=""),
-    order_id: str = Form(default=""),
-    token: str = Form(default=""),
-) -> dict:
-    """Обрабатывает postback от CryptoCloud при успешной оплате.
-
-    Пайплайн:
-    1. Верифицируем JWT-подпись postback-а
-    2. Находим payment по order_id
-    3. Обновляем статус на success
-    4. Активируем подписку (генерация секрета, добавление на ноду)
-    5. Обновляем статус на paid
-    6. Уведомляем пользователя через бота
+async def _parse_postback_data(request: Request) -> dict:
+    """Парсит данные postback из CryptoCloud (form-urlencoded или JSON).
 
     Args:
-        request: Объект FastAPI Request (содержит app.state со ссылками на сервисы).
-        status: Статус платежа от CryptoCloud (ожидаем "success").
-        invoice_id: ID инвойса в CryptoCloud.
-        amount_crypto: Сумма в криптовалюте.
-        currency: Код криптовалюты.
-        order_id: Наш payment.id.
-        token: JWT-подпись (HS256, подписана SECRET KEY проекта).
+        request: Объект FastAPI Request.
+
+    Returns:
+        Словарь с полями postback-а.
+    """
+    content_type = request.headers.get("content-type", "")
+
+    if "application/json" in content_type:
+        return await request.json()
+
+    # По умолчанию пробуем form-urlencoded
+    try:
+        form_data = await request.form()
+        return {k: v for k, v in form_data.items()}
+    except Exception:
+        # Fallback на JSON если form не парсится
+        try:
+            return await request.json()
+        except Exception:
+            # Последняя попытка — сырое тело
+            body = await request.body()
+            logger.error("Не удалось распарсить postback body: %s", body[:500])
+            return {}
+
+
+@router.post("/cryptocloud")
+async def cryptocloud_postback(request: Request) -> dict:
+    """Обрабатывает postback от CryptoCloud при успешной оплате.
+
+    Принимает данные в любом формате (JSON или form-urlencoded),
+    так как CryptoCloud может менять формат.
+
+    Пайплайн:
+    1. Парсим данные (JSON / form)
+    2. Верифицируем JWT-подпись
+    3. Находим payment по order_id
+    4. Обновляем статус на success
+    5. Активируем подписку
+    6. Обновляем статус на paid
+    7. Уведомляем пользователя
+
+    Args:
+        request: Объект FastAPI Request.
 
     Returns:
         Словарь с результатом обработки.
@@ -84,11 +98,19 @@ async def cryptocloud_postback(
     Raises:
         HTTPException: 403 при невалидной подписи JWT.
     """
+    data = await _parse_postback_data(request)
+
+    status = str(data.get("status", ""))
+    invoice_id = str(data.get("invoice_id", ""))
+    order_id = str(data.get("order_id", ""))
+    token = str(data.get("token", ""))
+
     logger.info(
-        "CryptoCloud postback: status=%s, invoice_id=%s, order_id=%s",
+        "CryptoCloud postback: status=%s, invoice_id=%s, order_id=%s, fields=%s",
         status,
         invoice_id,
         order_id,
+        list(form_data.keys()),
     )
 
     # === Верификация подписи ===
@@ -100,7 +122,7 @@ async def cryptocloud_postback(
             detail="Missing token",
         )
 
-    payload = _verify_cryptocloud_token(token, settings.cryptocloud.secret_key)
+    payload = _verify_cryptocloud_token(str(token), settings.cryptocloud.secret_key)
     if payload is None:
         logger.error("CryptoCloud postback: верификация JWT провалена")
         raise HTTPException(
@@ -115,13 +137,14 @@ async def cryptocloud_postback(
         return {"ok": True}
 
     # Находим платёж
-    if not order_id or not order_id.isdigit():
-        logger.error("Невалидный order_id: %s", order_id)
+    order_id_str = str(order_id)
+    if not order_id_str or not order_id_str.isdigit():
+        logger.error("Невалидный order_id: %s", order_id_str)
         return {"ok": False, "error": "invalid order_id"}
 
-    payment = await repo.payment.get_by_id(int(order_id))
+    payment = await repo.payment.get_by_id(int(order_id_str))
     if not payment:
-        logger.error("Платёж не найден: order_id=%s", order_id)
+        logger.error("Платёж не найден: order_id=%s", order_id_str)
         return {"ok": False, "error": "payment not found"}
 
     if payment["status"] in ("paid", "success"):
@@ -157,13 +180,6 @@ async def _activate_from_payment(
         Данные активированной подписки или None.
     """
     subscription_service: SubscriptionService = request.app.state.subscription_service
-
-    # Получаем полные данные платежа с планом
-    full_payment = await repo.payment.get_by_cryptocloud_uuid(
-        payment.get("cryptocloud_uuid", "")
-    )
-    if not full_payment:
-        full_payment = payment
 
     # Определяем ноду
     node_id = payment.get("node_id")
