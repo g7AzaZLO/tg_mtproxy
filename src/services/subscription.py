@@ -5,12 +5,13 @@
 """
 
 import logging
+from datetime import datetime, timedelta, timezone
 
 from src.db import repositories as repo
 from src.db.pool import transaction
 from src.services.node_manager import NodeManagerService
 from src.services.proxy import create_proxy_credentials
-from src.utils.crypto import build_proxy_link, build_proxy_link_https
+from src.utils.crypto import build_proxy_link, build_proxy_link_https, generate_secret
 
 logger = logging.getLogger(__name__)
 
@@ -143,6 +144,94 @@ class SubscriptionService:
         await repo.subscription.set_status(subscription_id, "expired")
         logger.info("Подписка #%d деактивирована", subscription_id)
         return True
+
+    async def rotate_key(
+        self,
+        subscription_id: int,
+        new_country: str,
+    ) -> dict:
+        """Меняет секрет подписки и опционально ноду (смена локации).
+
+        Удаляет старый секрет со старой ноды, генерирует новый,
+        добавляет на новую (или ту же) ноду, обновляет БД.
+
+        Args:
+            subscription_id: ID подписки.
+            new_country: Страна новой ноды.
+
+        Returns:
+            Словарь с результатом:
+            - ``{"status": "cooldown"}`` — лимит 24ч не прошёл
+            - ``{"status": "no_slots"}`` — нет свободных мест
+            - ``{"status": "error", "detail": ...}`` — ошибка
+            - ``{"status": "ok", ...}`` — успех, с новыми ссылками
+        """
+        sub = await repo.subscription.get_by_id(subscription_id)
+        if not sub:
+            return {"status": "error", "detail": "Подписка не найдена"}
+
+        # Проверка лимита: 1 раз в сутки
+        if sub.get("last_key_change"):
+            cooldown_until = sub["last_key_change"] + timedelta(hours=24)
+            if datetime.now(timezone.utc) < cooldown_until:
+                return {"status": "cooldown"}
+
+        # Найти новую ноду
+        new_node = await repo.node.get_least_loaded_node(new_country)
+        if not new_node:
+            return {"status": "no_slots"}
+
+        # Удалить старый секрет со старой ноды
+        old_node = await repo.node.get_by_id(sub["node_id"])
+        if old_node:
+            await self._node_manager.remove_secret(
+                agent_url=old_node["agent_url"],
+                agent_api_key=old_node["agent_api_key"],
+                secret=sub["secret"],
+            )
+
+        # Сгенерировать и добавить новый секрет
+        new_secret = generate_secret()
+        added = await self._node_manager.add_secret(
+            agent_url=new_node["agent_url"],
+            agent_api_key=new_node["agent_api_key"],
+            secret=new_secret,
+            user_id=sub["user_id"],
+            label=str(sub["user_id"]),
+        )
+        if not added:
+            logger.error(
+                "Не удалось добавить секрет на ноду %s при ротации подписки #%d",
+                new_node["name"],
+                subscription_id,
+            )
+            return {"status": "error", "detail": "Не удалось добавить секрет на ноду"}
+
+        # Обновить БД
+        await repo.subscription.update_secret_and_node(
+            subscription_id,
+            new_secret=new_secret,
+            new_node_id=new_node["id"],
+        )
+
+        logger.info(
+            "Ключ подписки #%d заменён, нода: %s -> %s",
+            subscription_id,
+            old_node["name"] if old_node else "?",
+            new_node["name"],
+        )
+
+        return {
+            "status": "ok",
+            "host": new_node["host"],
+            "port": new_node["port"],
+            "node_name": new_node["name"],
+            "country_flag": new_node["country_flag"],
+            "tg_link": build_proxy_link(new_node["host"], new_node["port"], new_secret),
+            "https_link": build_proxy_link_https(
+                new_node["host"], new_node["port"], new_secret
+            ),
+        }
 
     async def get_user_proxies(self, user_id: int) -> list[dict]:
         """Возвращает активные прокси пользователя с ссылками.

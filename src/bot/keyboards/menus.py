@@ -12,6 +12,7 @@ from src.bot.callbacks.factories import (
     LocationCallback,
     MyProxiesCallback,
     PlanCallback,
+    RotateCallback,
 )
 
 
@@ -183,11 +184,14 @@ def proxy_link_keyboard(tg_link: str) -> InlineKeyboardMarkup:
 def my_proxies_keyboard(subscriptions: list[dict]) -> InlineKeyboardMarkup:
     """Клавиатура со списком активных прокси пользователя.
 
+    Для каждой подписки: кнопка-ссылка на подключение
+    и кнопка «Сменить ключ» для ротации секрета / смены локации.
+
     Args:
         subscriptions: Список активных подписок.
 
     Returns:
-        Клавиатура с кнопками подключения для каждого прокси.
+        Клавиатура с кнопками для каждого прокси.
     """
     builder = InlineKeyboardBuilder()
     for sub in subscriptions:
@@ -197,13 +201,61 @@ def my_proxies_keyboard(subscriptions: list[dict]) -> InlineKeyboardMarkup:
         builder.row(
             InlineKeyboardButton(
                 text=f"{flag} {name} (до {expires})",
-                url=sub["tg_link"],
+                url=sub["https_link"],
+            )
+        )
+        builder.row(
+            InlineKeyboardButton(
+                text="🔄 Сменить ключ",
+                callback_data=MyProxiesCallback(
+                    action="rotate",
+                    subscription_id=sub["id"],
+                ).pack(),
             )
         )
     builder.row(
         InlineKeyboardButton(
             text="« Главное меню",
             callback_data=BackCallback(to="main").pack(),
+        )
+    )
+    return builder.as_markup()
+
+
+def rotate_locations_keyboard(
+    countries: list[dict],
+    subscription_id: int,
+    current_country: str,
+) -> InlineKeyboardMarkup:
+    """Клавиатура выбора страны при ротации ключа.
+
+    Текущая страна помечается галочкой.
+
+    Args:
+        countries: Список словарей с полями country и country_flag.
+        subscription_id: ID подписки.
+        current_country: Текущая страна подписки.
+
+    Returns:
+        Клавиатура с кнопками стран для ротации.
+    """
+    builder = InlineKeyboardBuilder()
+    for item in countries:
+        mark = " ✓" if item["country"] == current_country else ""
+        text = f"{item['country_flag']} {item['country']}{mark}"
+        builder.row(
+            InlineKeyboardButton(
+                text=text,
+                callback_data=RotateCallback(
+                    subscription_id=subscription_id,
+                    country=item["country"],
+                ).pack(),
+            )
+        )
+    builder.row(
+        InlineKeyboardButton(
+            text="« Назад к прокси",
+            callback_data=MyProxiesCallback(action="list").pack(),
         )
     )
     return builder.as_markup()

@@ -65,6 +65,18 @@ class AdminCallback(CallbackData, prefix="adm"):
     target_id: int = 0
 
 
+class RotateCallback(CallbackData, prefix="rot"):
+    """Выбор страны при ротации ключа.
+
+    Attributes:
+        subscription_id: ID подписки для ротации.
+        country: Новая страна.
+    """
+
+    subscription_id: int
+    country: str
+
+
 class BackCallback(CallbackData, prefix="back"):
     """Кнопка «Назад» для возврата в предыдущее меню.
 

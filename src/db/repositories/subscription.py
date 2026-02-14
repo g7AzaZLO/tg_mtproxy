@@ -189,6 +189,37 @@ async def count_active() -> int:
         )
 
 
+async def update_secret_and_node(
+    subscription_id: int,
+    *,
+    new_secret: str,
+    new_node_id: int,
+) -> dict | None:
+    """Обновляет секрет, ноду и время последней смены ключа.
+
+    Args:
+        subscription_id: ID подписки.
+        new_secret: Новый dd-секрет.
+        new_node_id: ID новой ноды.
+
+    Returns:
+        Обновлённая подписка или None.
+    """
+    async with acquire() as conn:
+        row = await conn.fetchrow(
+            """
+            UPDATE subscriptions
+            SET secret = $1, node_id = $2, last_key_change = NOW()
+            WHERE id = $3
+            RETURNING *
+            """,
+            new_secret,
+            new_node_id,
+            subscription_id,
+        )
+        return dict(row) if row else None
+
+
 async def get_all(
     limit: int = 50,
     offset: int = 0,
