@@ -51,9 +51,7 @@ async def main() -> None:
     # === Сервисы ===
     node_manager = NodeManagerService()
     payment_service = PaymentService(settings.cryptocloud)
-    subscription_service = SubscriptionService(
-        node_manager, tls_domain=settings.service.tls_domain
-    )
+    subscription_service = SubscriptionService(node_manager)
 
     # === Telegram Bot ===
     bot = Bot(
