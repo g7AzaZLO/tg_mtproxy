@@ -1,38 +1,43 @@
 """Утилиты для генерации секретов и формирования прокси-ссылок.
 
-Секреты формата fake-TLS (dd-prefix) обеспечивают маскировку
-MTProto-трафика под HTTPS, что помогает обходить DPI.
+Секреты хранятся в БД и конфиге mtprotoproxy как чистые 32 hex-символа (16 байт).
+Префикс dd (fake-TLS) добавляется только при формировании ссылки для пользователя.
 """
 
 import secrets
 from urllib.parse import urlencode
 
+DD_PREFIX = "dd"
+
 
 def generate_secret() -> str:
-    """Генерирует случайный dd-секрет для fake-TLS MTProxy.
+    """Генерирует случайный секрет для MTProxy.
 
-    Формат: dd + 32 hex-символа (16 случайных байт).
-    Префикс dd указывает mtprotoproxy использовать fake-TLS.
+    Формат: 32 hex-символа (16 случайных байт).
+    Этот секрет записывается в конфиг mtprotoproxy и в БД.
+    Префикс dd добавляется отдельно при формировании ссылки.
 
     Returns:
-        Строка секрета длиной 34 символа (например, dd1234abcd...).
+        Строка секрета длиной 32 символа (например, a1b2c3d4...).
     """
-    random_bytes = secrets.token_hex(16)
-    return f"dd{random_bytes}"
+    return secrets.token_hex(16)
 
 
 def build_proxy_link(host: str, port: int, secret: str) -> str:
     """Формирует deep-link для автоматического добавления прокси в Telegram.
 
+    Добавляет dd-префикс к секрету для включения fake-TLS.
+
     Args:
         host: IP-адрес или домен сервера.
         port: Порт MTProxy.
-        secret: Секрет (dd-формат).
+        secret: Чистый секрет (32 hex, без dd-префикса).
 
     Returns:
-        Ссылка вида tg://proxy?server=HOST&port=PORT&secret=SECRET.
+        Ссылка вида tg://proxy?server=HOST&port=PORT&secret=ddSECRET.
     """
-    params = urlencode({"server": host, "port": port, "secret": secret})
+    dd_secret = f"{DD_PREFIX}{secret}"
+    params = urlencode({"server": host, "port": port, "secret": dd_secret})
     return f"tg://proxy?{params}"
 
 
@@ -44,10 +49,11 @@ def build_proxy_link_https(host: str, port: int, secret: str) -> str:
     Args:
         host: IP-адрес или домен сервера.
         port: Порт MTProxy.
-        secret: Секрет (dd-формат).
+        secret: Чистый секрет (32 hex, без dd-префикса).
 
     Returns:
-        Ссылка вида https://t.me/proxy?server=HOST&port=PORT&secret=SECRET.
+        Ссылка вида https://t.me/proxy?server=HOST&port=PORT&secret=ddSECRET.
     """
-    params = urlencode({"server": host, "port": port, "secret": secret})
+    dd_secret = f"{DD_PREFIX}{secret}"
+    params = urlencode({"server": host, "port": port, "secret": dd_secret})
     return f"https://t.me/proxy?{params}"
