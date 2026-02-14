@@ -81,6 +81,7 @@ class SubscriptionService:
                 plan_id=plan_id,
                 secret=credentials["secret"],
                 duration_days=duration_days,
+                is_trial=is_trial,
             )
             await repo.payment.set_paid(
                 payment_id,

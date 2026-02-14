@@ -8,7 +8,6 @@
 """
 
 import logging
-from typing import Any
 
 from aiogram import Bot
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup

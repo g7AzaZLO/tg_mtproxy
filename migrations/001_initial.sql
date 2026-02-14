@@ -118,7 +118,7 @@ CREATE TABLE IF NOT EXISTS schema_migrations (
 -- Начальные тарифные планы
 -- ============================================================
 INSERT INTO plans (name, duration_days, price_usd, is_trial) VALUES
-    ('Пробный (2 дня)',  2,  0.00, TRUE),
+    ('Пробный (3 дня)',  3,  0.00, TRUE),
     ('7 дней',           7,  1.50, FALSE),
     ('30 дней',          30, 3.00, FALSE),
     ('90 дней',          90, 7.00, FALSE)

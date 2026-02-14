@@ -15,6 +15,7 @@ async def create(
     plan_id: int,
     secret: str,
     duration_days: int,
+    is_trial: bool = False,
 ) -> dict:
     """Создаёт новую подписку в рамках существующей транзакции.
 
@@ -25,6 +26,8 @@ async def create(
         plan_id: ID тарифного плана.
         secret: Сгенерированный dd-секрет.
         duration_days: Длительность подписки в днях.
+        is_trial: Пробная подписка — сразу помечается как notified_3d,
+            чтобы не получать бессмысленное уведомление «осталось 3 дня».
 
     Returns:
         Словарь с данными созданной подписки.
@@ -34,14 +37,15 @@ async def create(
 
     row = await conn.fetchrow(
         "INSERT INTO subscriptions "
-        "(user_id, node_id, plan_id, secret, starts_at, expires_at, status) "
-        "VALUES ($1, $2, $3, $4, $5, $6, 'active') RETURNING *",
+        "(user_id, node_id, plan_id, secret, starts_at, expires_at, status, notified_3d) "
+        "VALUES ($1, $2, $3, $4, $5, $6, 'active', $7) RETURNING *",
         user_id,
         node_id,
         plan_id,
         secret,
         now,
         expires_at,
+        is_trial,
     )
     return dict(row)
 

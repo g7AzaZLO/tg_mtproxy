@@ -95,7 +95,7 @@ class ServiceSettings(BaseSettings):
         default="",
         description="Telegram ID администраторов через запятую",
     )
-    trial_duration_days: int = Field(default=2, description="Длительность пробного периода")
+    trial_duration_days: int = Field(default=3, description="Длительность пробного периода")
     notify_before_days: str = Field(
         default="3,1",
         description="Дни до окончания подписки для отправки напоминаний (через запятую)",
