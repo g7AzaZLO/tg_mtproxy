@@ -244,6 +244,25 @@ cat > config.py << 'PYEOF'
 PORT = 443
 USERS = {
 }
+
+# Домен-маскировка для fake-TLS (не оставляйте www.google.com!)
+TLS_DOMAIN = "ya.ru"
+
+# Отключить IPv6 (если IPv6 не работает — вызывает таймаут первого подключения)
+PREFER_IPV6 = False
+
+# Увеличенные буферы (для серверов с >= 1GB RAM)
+TO_CLT_BUFSIZE = 524288
+TO_TG_BUFSIZE = 524288
+
+# Держать соединение клиента 1 час (меньше переподключений)
+CLIENT_KEEPALIVE = 3600
+
+MODES = {
+    "classic": False,
+    "secure": True,
+    "tls": True,
+}
 PYEOF
 
 cat > /etc/systemd/system/mtprotoproxy.service << 'EOF'
@@ -515,4 +534,72 @@ cd /opt/node_agent
 scp root@IP_ОСНОВНОГО:/opt/tg_mtproxy/node_agent/agent.py ./
 scp root@IP_ОСНОВНОГО:/opt/tg_mtproxy/node_agent/config_manager.py ./
 systemctl restart node-agent
+```
+
+## Сборка питона 3.12
+
+# 1) Зависимости для сборки
+```bash
+apt update
+apt install -y \
+  build-essential wget curl ca-certificates \
+  libssl-dev zlib1g-dev libbz2-dev libreadline-dev libsqlite3-dev \
+  libffi-dev libncursesw5-dev xz-utils tk-dev libgdbm-dev libnss3-dev \
+  liblzma-dev uuid-dev
+```
+
+# 2) Сборка и установка Python 3.12 (не ломает системный python)
+```bash
+cd /usr/src
+wget -q https://www.python.org/ftp/python/3.12.8/Python-3.12.8.tgz
+tar -xzf Python-3.12.8.tgz
+cd Python-3.12.8
+./configure --enable-optimizations --with-ensurepip=install
+make -j"$(nproc)"
+make altinstall
+```
+
+# 3) Проверка
+```bash
+python3.12 --version
+```
+
+# 4) Пересоздание venv для node-agent
+```bash
+cd /opt/node_agent
+rm -rf .venv
+python3.12 -m venv .venv
+source .venv/bin/activate
+```
+
+# 5) Установка зависимостей
+```bash
+pip install -U pip setuptools wheel
+pip install fastapi "uvicorn[standard]"
+```
+
+# 6) Перезапуск сервиса и проверка
+```bash
+systemctl restart node-agent
+systemctl status node-agent --no-pager -l
+journalctl -u node-agent -n 80 --no-pager
+```
+
+
+## Замена TLS_DOMAIN
+Проверка пингов
+```bash
+curl -so /dev/null -w "%{time_total}s\n" https://www.cloudflare.com
+curl -so /dev/null -w "%{time_total}s\n" https://cdn.jsdelivr.net
+curl -so /dev/null -w "%{time_total}s\n" https://www.microsoft.com
+```
+
+```bash
+cat >> /opt/mtprotoproxy/config.py << 'EOF'
+
+TLS_DOMAIN = "ya.ru"
+EOF
+
+systemctl restart mtprotoproxy
+journalctl -u mtprotoproxy -n 20 --no-pager
 ```

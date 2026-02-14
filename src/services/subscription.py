@@ -10,7 +10,7 @@ from src.db import repositories as repo
 from src.db.pool import transaction
 from src.services.node_manager import NodeManagerService
 from src.services.proxy import create_proxy_credentials
-from src.utils.crypto import build_proxy_link, build_proxy_link_https
+from src.utils.crypto import DEFAULT_TLS_DOMAIN, build_proxy_link, build_proxy_link_https
 
 logger = logging.getLogger(__name__)
 
@@ -20,15 +20,22 @@ class SubscriptionService:
 
     Attributes:
         _node_manager: Сервис для взаимодействия с нодами.
+        _tls_domain: Домен-маскировка для fake-TLS ссылок.
     """
 
-    def __init__(self, node_manager: NodeManagerService) -> None:
+    def __init__(
+        self,
+        node_manager: NodeManagerService,
+        tls_domain: str = DEFAULT_TLS_DOMAIN,
+    ) -> None:
         """Инициализирует сервис подписок.
 
         Args:
             node_manager: Экземпляр NodeManagerService.
+            tls_domain: Домен-маскировка для ee-ссылок.
         """
         self._node_manager = node_manager
+        self._tls_domain = tls_domain
 
     async def activate_subscription(
         self,
@@ -58,7 +65,9 @@ class SubscriptionService:
             logger.error("Нода node_id=%d не найдена", node_id)
             return None
 
-        credentials = create_proxy_credentials(node["host"], node["port"])
+        credentials = create_proxy_credentials(
+            node["host"], node["port"], self._tls_domain
+        )
 
         # Добавляем секрет на ноду
         added = await self._node_manager.add_secret(
@@ -155,6 +164,10 @@ class SubscriptionService:
         """
         subscriptions = await repo.subscription.get_active_by_user(user_id)
         for sub in subscriptions:
-            sub["tg_link"] = build_proxy_link(sub["host"], sub["port"], sub["secret"])
-            sub["https_link"] = build_proxy_link_https(sub["host"], sub["port"], sub["secret"])
+            sub["tg_link"] = build_proxy_link(
+                sub["host"], sub["port"], sub["secret"], self._tls_domain
+            )
+            sub["https_link"] = build_proxy_link_https(
+                sub["host"], sub["port"], sub["secret"], self._tls_domain
+            )
         return subscriptions

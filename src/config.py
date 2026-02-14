@@ -96,6 +96,10 @@ class ServiceSettings(BaseSettings):
         description="Telegram ID администраторов через запятую",
     )
     trial_duration_days: int = Field(default=3, description="Длительность пробного периода")
+    tls_domain: str = Field(
+        default="ya.ru",
+        description="Домен-маскировка для fake-TLS (ee-режим) в ссылках прокси",
+    )
     notify_before_days: str = Field(
         default="3,1",
         description="Дни до окончания подписки для отправки напоминаний (через запятую)",
