@@ -6,6 +6,7 @@ from aiogram.types import CallbackQuery, Message
 
 from src.bot.callbacks.factories import BackCallback
 from src.bot.keyboards.menus import main_menu_keyboard
+from src.services.proxy import get_proxy_usage_rules
 
 router = Router(name="start")
 
@@ -41,6 +42,21 @@ async def back_to_main(callback: CallbackQuery) -> None:
     """
     await callback.message.edit_text(
         WELCOME_TEXT,
+        reply_markup=main_menu_keyboard(),
+        parse_mode="HTML",
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data == "proxy_rules")
+async def show_proxy_rules(callback: CallbackQuery) -> None:
+    """Показывает правила использования прокси.
+
+    Args:
+        callback: Callback-запрос от кнопки правил.
+    """
+    await callback.message.edit_text(
+        get_proxy_usage_rules(),
         reply_markup=main_menu_keyboard(),
         parse_mode="HTML",
     )

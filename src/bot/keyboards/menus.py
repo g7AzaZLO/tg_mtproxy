@@ -35,6 +35,9 @@ def main_menu_keyboard() -> InlineKeyboardMarkup:
     builder.row(
         InlineKeyboardButton(text="Пробный период", callback_data="trial_start"),
     )
+    builder.row(
+        InlineKeyboardButton(text="Правила использования", callback_data="proxy_rules"),
+    )
     return builder.as_markup()
 
 
