@@ -91,9 +91,11 @@ async def start_rotate(
 
     await callback.message.edit_text(
         "🔄 <b>Смена ключа</b>\n\n"
+        "⚠️ <b>Перед заменой отключите текущее прокси-соединение</b> "
+        "в настройках Telegram, иначе связь оборвётся.\n\n"
         "Выберите локацию для нового ключа.\n"
         "Можно выбрать текущую (отмечена ✓) или другую страну.\n\n"
-        "⚠️ Доступно 1 раз в сутки.",
+        "Доступно 1 раз в сутки.",
         reply_markup=rotate_locations_keyboard(
             countries,
             callback_data.subscription_id,
