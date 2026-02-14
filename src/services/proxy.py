@@ -3,17 +3,12 @@
 from src.utils.crypto import build_proxy_link, build_proxy_link_https, generate_secret
 
 
-def create_proxy_credentials(
-    host: str,
-    port: int,
-    tls_domain: str = "ya.ru",
-) -> dict[str, str]:
+def create_proxy_credentials(host: str, port: int) -> dict[str, str]:
     """Генерирует секрет и формирует ссылки для подключения прокси.
 
     Args:
         host: IP-адрес или домен сервера MTProxy.
         port: Порт MTProxy.
-        tls_domain: Домен для FakeTLS-маскировки.
 
     Returns:
         Словарь с ключами ``secret``, ``tg_link`` и ``https_link``.
@@ -21,8 +16,8 @@ def create_proxy_credentials(
     secret = generate_secret()
     return {
         "secret": secret,
-        "tg_link": build_proxy_link(host, port, secret, tls_domain),
-        "https_link": build_proxy_link_https(host, port, secret, tls_domain),
+        "tg_link": build_proxy_link(host, port, secret),
+        "https_link": build_proxy_link_https(host, port, secret),
     }
 
 

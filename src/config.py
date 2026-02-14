@@ -95,10 +95,6 @@ class ServiceSettings(BaseSettings):
         default="",
         description="Telegram ID администраторов через запятую",
     )
-    tls_domain: str = Field(
-        default="ya.ru",
-        description="Домен для FakeTLS-маскировки (должен совпадать с TLS_DOMAIN в mtprotoproxy)",
-    )
     trial_duration_days: int = Field(default=3, description="Длительность пробного периода")
     notify_before_days: str = Field(
         default="3,1",
