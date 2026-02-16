@@ -639,11 +639,12 @@ install -m 0755 scripts/add3proxyuser.sh /usr/local/bin/add3proxyuser.sh
 ### 5.2. Конфигурация 3proxy
 
 ```bash
-mkdir -p /opt/3proxy
-touch /opt/3proxy/passwd
+mkdir -p /opt/3proxy /var/log/3proxy
+
+# Файл паролей (не может быть пустым — добавляем заглушку)
+echo "placeholder:CL:placeholder" > /opt/3proxy/passwd
 
 cat > /opt/3proxy/3proxy.cfg << 'EOF'
-# 3proxy SOCKS5 config
 nscache 65536
 nserver 8.8.8.8
 nserver 1.1.1.1
@@ -652,15 +653,13 @@ log /var/log/3proxy/3proxy.log D
 logformat "- +_L%t.%. %N.%p %E %C:%c %R:%r %O %I %h %T"
 rotate 7
 
-# Авторизация по логину/паролю из файла
 auth strong
 users $/opt/3proxy/passwd
 
-# SOCKS5 на порту 1080
+allow *
+
 socks -p1080
 EOF
-
-mkdir -p /var/log/3proxy
 ```
 
 ### 5.3. Systemd-сервис для 3proxy
@@ -684,6 +683,9 @@ EOF
 systemctl daemon-reload
 systemctl enable --now 3proxy
 systemctl status 3proxy
+
+# Проверка
+ss -tlnp | grep 1080
 ```
 
 ### 5.4. Файрвол на ноде
