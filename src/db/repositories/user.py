@@ -1,5 +1,7 @@
 """Репозиторий пользователей — raw SQL запросы через asyncpg."""
 
+import asyncpg
+
 from src.db.pool import acquire
 
 
@@ -86,6 +88,34 @@ async def mark_trial_used(user_id: int) -> None:
             "UPDATE users SET used_trial = TRUE WHERE id = $1",
             user_id,
         )
+
+
+async def try_mark_trial_used(
+    conn: asyncpg.Connection,
+    *,
+    user_id: int,
+) -> bool:
+    """Пытается атомарно пометить триал как использованный.
+
+    Args:
+        conn: Активное соединение asyncpg (обычно внутри транзакции).
+        user_id: Внутренний ID пользователя.
+
+    Returns:
+        True, если флаг был выставлен в этом вызове.
+        False, если триал уже был использован ранее.
+    """
+    row = await conn.fetchrow(
+        """
+        UPDATE users
+        SET used_trial = TRUE
+        WHERE id = $1
+          AND used_trial = FALSE
+        RETURNING id
+        """,
+        user_id,
+    )
+    return row is not None
 
 
 async def set_banned(user_id: int, *, is_banned: bool) -> None:

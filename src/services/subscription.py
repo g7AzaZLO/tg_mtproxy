@@ -124,18 +124,33 @@ class SubscriptionService:
             logger.error("Не удалось добавить секрет на ноду %s", node["name"])
             return None
 
+        duplicate_trial = False
         async with transaction() as conn:
-            subscription = await repo.subscription.create(
-                conn, user_id=user_id, node_id=node_id, plan_id=plan_id,
-                secret=credentials["secret"], duration_days=duration_days,
-                is_trial=is_trial, access_type="mtproto",
-            )
-            await repo.payment.set_paid(
-                payment_id, subscription_id=subscription["id"], conn=conn,
-            )
+            if is_trial:
+                trial_reserved = await repo.user.try_mark_trial_used(
+                    conn,
+                    user_id=user_id,
+                )
+                if not trial_reserved:
+                    duplicate_trial = True
+            if not duplicate_trial:
+                subscription = await repo.subscription.create(
+                    conn, user_id=user_id, node_id=node_id, plan_id=plan_id,
+                    secret=credentials["secret"], duration_days=duration_days,
+                    is_trial=is_trial, access_type="mtproto",
+                )
+                await repo.payment.set_paid(
+                    payment_id, subscription_id=subscription["id"], conn=conn,
+                )
 
-        if is_trial:
-            await repo.user.mark_trial_used(user_id)
+        if duplicate_trial:
+            await self._node_manager.remove_secret(
+                agent_url=node["agent_url"],
+                agent_api_key=node["agent_api_key"],
+                secret=credentials["secret"],
+            )
+            logger.warning("Повторная попытка активации trial user_id=%d", user_id)
+            return None
 
         logger.info(
             "MTProto подписка #%d активирована для user_id=%d на ноде %s",
@@ -189,19 +204,34 @@ class SubscriptionService:
             return None
 
         # Храним username в secret, password в marzban_username (переиспользуем поле)
+        duplicate_trial = False
         async with transaction() as conn:
-            subscription = await repo.subscription.create(
-                conn, user_id=user_id, node_id=node_id, plan_id=plan_id,
-                secret=username, duration_days=duration_days,
-                is_trial=is_trial, access_type="socks5",
-                marzban_username=password,
-            )
-            await repo.payment.set_paid(
-                payment_id, subscription_id=subscription["id"], conn=conn,
-            )
+            if is_trial:
+                trial_reserved = await repo.user.try_mark_trial_used(
+                    conn,
+                    user_id=user_id,
+                )
+                if not trial_reserved:
+                    duplicate_trial = True
+            if not duplicate_trial:
+                subscription = await repo.subscription.create(
+                    conn, user_id=user_id, node_id=node_id, plan_id=plan_id,
+                    secret=username, duration_days=duration_days,
+                    is_trial=is_trial, access_type="socks5",
+                    marzban_username=password,
+                )
+                await repo.payment.set_paid(
+                    payment_id, subscription_id=subscription["id"], conn=conn,
+                )
 
-        if is_trial:
-            await repo.user.mark_trial_used(user_id)
+        if duplicate_trial:
+            await self._node_manager.remove_socks5_user(
+                agent_url=node["agent_url"],
+                agent_api_key=node["agent_api_key"],
+                username=username,
+            )
+            logger.warning("Повторная попытка активации trial user_id=%d", user_id)
+            return None
 
         logger.info(
             "SOCKS5 подписка #%d активирована для user_id=%d на ноде %s",

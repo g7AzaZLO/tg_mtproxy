@@ -4,6 +4,7 @@
 """
 
 import logging
+from asyncio import Lock
 
 from aiogram import F, Router
 from aiogram.types import CallbackQuery
@@ -32,6 +33,7 @@ from src.services.subscription import SubscriptionService
 logger = logging.getLogger(__name__)
 
 router = Router(name="buy")
+_trial_locks: dict[int, Lock] = {}
 
 _PROXY_TYPE_DESCRIPTION = (
     "<b>Выберите тип прокси:</b>\n\n"
@@ -45,6 +47,22 @@ _PROXY_TYPE_DESCRIPTION = (
     "• Отлично подходит для телефонов и любых устройств.\n"
     "• Быстрое подключение и высокая скорость."
 )
+
+
+def _get_trial_lock(user_id: int) -> Lock:
+    """Возвращает lock для сериализации trial-активаций пользователя.
+
+    Args:
+        user_id: Внутренний ID пользователя.
+
+    Returns:
+        Экземпляр asyncio.Lock для пользователя.
+    """
+    lock = _trial_locks.get(user_id)
+    if lock is None:
+        lock = Lock()
+        _trial_locks[user_id] = lock
+    return lock
 
 
 # ------------------------------------------------------------------
@@ -267,43 +285,48 @@ async def _handle_trial(
         plan: Данные тарифного плана.
         subscription_service: Сервис подписок.
     """
-    if db_user.get("used_trial"):
-        await callback.answer("Вы уже использовали пробный период.", show_alert=True)
-        return
+    lock = _get_trial_lock(db_user["id"])
+    async with lock:
+        fresh_user = await repo.user.get_by_id(db_user["id"])
+        if fresh_user and fresh_user.get("used_trial"):
+            await callback.answer("Вы уже использовали пробный период.", show_alert=True)
+            return
 
-    await callback.message.edit_text("Активирую пробный период...")
+        await callback.message.edit_text("Активирую пробный период...")
 
-    from src.db.pool import acquire
+        from src.db.pool import acquire
 
-    async with acquire() as conn:
-        payment = await repo.payment.create(
-            conn,
+        async with acquire() as conn:
+            payment = await repo.payment.create(
+                conn,
+                user_id=db_user["id"],
+                plan_id=plan["id"],
+                node_id=callback_data.node_id,
+                amount_usd=0,
+                access_type=callback_data.proxy_type,
+            )
+        await repo.payment.set_status(payment["id"], "success")
+
+        result = await subscription_service.activate_subscription(
+            payment_id=payment["id"],
             user_id=db_user["id"],
             plan_id=plan["id"],
             node_id=callback_data.node_id,
-            amount_usd=0,
+            duration_days=plan["duration_days"],
+            is_trial=True,
             access_type=callback_data.proxy_type,
         )
-    await repo.payment.set_status(payment["id"], "success")
 
-    result = await subscription_service.activate_subscription(
-        payment_id=payment["id"],
-        user_id=db_user["id"],
-        plan_id=plan["id"],
-        node_id=callback_data.node_id,
-        duration_days=plan["duration_days"],
-        is_trial=True,
-        access_type=callback_data.proxy_type,
-    )
+        if not result:
+            await repo.payment.set_status(payment["id"], "cancelled")
+            await callback.message.edit_text(
+                "Пробный период уже использован или активация не удалась. "
+                "Если это ошибка — попробуйте позже."
+            )
+            return
 
-    if not result:
-        await callback.message.edit_text(
-            "Произошла ошибка при активации. Попробуйте позже или обратитесь в поддержку."
-        )
-        return
-
-    await _send_activation_message(callback, result, plan)
-    await callback.answer()
+        await _send_activation_message(callback, result, plan)
+        await callback.answer()
 
 
 async def _send_activation_message(
