@@ -72,6 +72,13 @@ class SubscriptionService:
         Returns:
             Словарь с данными подписки и credentials, или None при ошибке.
         """
+        # Атомарная проверка триала — свежие данные из БД
+        if is_trial:
+            user = await repo.user.get_by_id(user_id)
+            if user and user.get("used_trial"):
+                logger.warning("Повторная попытка активации триала user_id=%d", user_id)
+                return None
+
         if access_type == "socks5":
             return await self._activate_socks5(
                 payment_id=payment_id, user_id=user_id, plan_id=plan_id,

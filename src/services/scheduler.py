@@ -146,6 +146,7 @@ async def _retry_stuck_payments(
                 node_id=payment["node_id"],
                 duration_days=plan["duration_days"],
                 is_trial=plan["is_trial"],
+                access_type=payment.get("access_type", "mtproto"),
             )
             if result:
                 user = await repo.user.get_by_id(payment["user_id"])
@@ -239,20 +240,40 @@ async def _send_activation_notification(
         user: Данные пользователя.
         subscription_data: Данные подписки с ссылками.
     """
-    from src.services.proxy import format_proxy_message
+    from src.services.proxy import format_proxy_message, format_socks5_message
 
     plan = await repo.plan.get_by_id(subscription_data["plan_id"])
-    text = format_proxy_message(
-        node_name=subscription_data.get("node_name", "Сервер"),
-        country_flag=subscription_data.get("country_flag", ""),
-        plan_name=plan["name"] if plan else "—",
-        expires_at=subscription_data["expires_at"].strftime("%d.%m.%Y %H:%M"),
-        tg_link=subscription_data["tg_link"],
-        https_link=subscription_data["https_link"],
-    )
-    keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="Подключить прокси", url=subscription_data["tg_link"])],
-    ])
+    plan_name = plan["name"] if plan else "—"
+    access_type = subscription_data.get("access_type", "mtproto")
+
+    if access_type == "socks5" and subscription_data.get("socks5_host"):
+        text = format_socks5_message(
+            node_name=subscription_data.get("node_name", "Сервер"),
+            country_flag=subscription_data.get("country_flag", ""),
+            plan_name=plan_name,
+            expires_at=subscription_data["expires_at"].strftime("%d.%m.%Y %H:%M"),
+            host=subscription_data["socks5_host"],
+            port=subscription_data["socks5_port"],
+            username=subscription_data["socks5_username"],
+            password=subscription_data["socks5_password"],
+        )
+        keyboard = None
+    else:
+        text = format_proxy_message(
+            node_name=subscription_data.get("node_name", "Сервер"),
+            country_flag=subscription_data.get("country_flag", ""),
+            plan_name=plan_name,
+            expires_at=subscription_data["expires_at"].strftime("%d.%m.%Y %H:%M"),
+            tg_link=subscription_data.get("tg_link", ""),
+            https_link=subscription_data.get("https_link", ""),
+        )
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(
+                text="Подключить прокси",
+                url=subscription_data.get("https_link", ""),
+            )],
+        ])
+
     try:
         await bot.send_message(
             chat_id=user["telegram_id"],
