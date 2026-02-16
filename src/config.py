@@ -74,6 +74,10 @@ class AdminSettings(BaseSettings):
 
     username: str = Field(default="admin", description="Логин администратора")
     password: str = Field(description="Пароль администратора")
+    telegram_bot_name: str = Field(
+        default="",
+        description="Username бота для Telegram Login Widget (без @)",
+    )
 
 
 class JWTSettings(BaseSettings):

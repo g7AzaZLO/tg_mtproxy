@@ -65,6 +65,7 @@ WEB_BASE_URL=https://ваш_домен.com
 # Админка
 ADMIN_USERNAME=ваш_логин
 ADMIN_PASSWORD="ваш_пароль"
+ADMIN_TELEGRAM_BOT_NAME=username_бота_без_@
 
 # JWT (сгенерировать: python3 -c "import secrets; print(secrets.token_hex(32))")
 JWT_SECRET="сгенерированная_строка"
@@ -372,6 +373,9 @@ TOKEN=$(curl -s -X POST https://ваш_домен.com/api/admin/login \
 
 echo $TOKEN
 ```
+
+Либо откройте `https://ваш_домен.com/admin/` и выполните вход через Telegram Login Widget
+(должен быть указан `ADMIN_TELEGRAM_BOT_NAME`, а ваш `telegram_id` должен быть в `ADMIN_IDS`).
 
 ### 3.2. Добавить ноду
 

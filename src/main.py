@@ -88,6 +88,7 @@ async def main() -> None:
     web_app.state.bot = bot
     web_app.state.subscription_service = subscription_service
     web_app.state.payment_service = payment_service
+    web_app.state.node_manager = node_manager
     web_app.state.settings = settings
 
     # === Scheduler ===

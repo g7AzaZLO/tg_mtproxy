@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MTProxy Admin</title>
+    <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+<div id="app">
+    <header class="header">
+        <h1>MTProxy Admin</h1>
+        <div class="header-actions">
+            <span id="auth-state">Не авторизован</span>
+            <button id="logout-btn" class="btn btn-outline" hidden>Выйти</button>
+        </div>
+    </header>
+
+    <section id="login-section" class="card">
+        <h2>Вход в админ-панель</h2>
+        <p>Рекомендуемый вход: через Telegram админ-аккаунт (whitelist).</p>
+        <div id="telegram-login-container"></div>
+        <details>
+            <summary>Резервный вход (логин/пароль)</summary>
+            <form id="password-login-form" class="inline-form">
+                <input type="text" id="login-username" placeholder="username" required />
+                <input type="password" id="login-password" placeholder="password" required />
+                <button type="submit" class="btn">Войти</button>
+            </form>
+        </details>
+    </section>
+
+    <section id="admin-section" hidden>
+        <nav class="tabs">
+            <button class="tab-btn active" data-tab="dashboard">Dashboard</button>
+            <button class="tab-btn" data-tab="users">Пользователи</button>
+            <button class="tab-btn" data-tab="nodes">Ноды</button>
+            <button class="tab-btn" data-tab="subscriptions">Подписки</button>
+            <button class="tab-btn" data-tab="payments">Платежи</button>
+            <button class="tab-btn" data-tab="plans">Тарифы</button>
+        </nav>
+
+        <div id="tab-dashboard" class="tab-content active">
+            <div id="kpi-grid" class="kpi-grid"></div>
+            <h3>Ноды: статус и загрузка</h3>
+            <div id="nodes-dashboard"></div>
+        </div>
+
+        <div id="tab-users" class="tab-content">
+            <div class="toolbar">
+                <input id="users-search" placeholder="Поиск по username" />
+                <button id="users-refresh" class="btn">Обновить</button>
+            </div>
+            <div id="users-table"></div>
+        </div>
+
+        <div id="tab-nodes" class="tab-content">
+            <div class="toolbar">
+                <button id="nodes-refresh" class="btn">Обновить</button>
+                <button id="node-create-btn" class="btn">Добавить ноду</button>
+            </div>
+            <div id="nodes-table"></div>
+        </div>
+
+        <div id="tab-subscriptions" class="tab-content">
+            <div class="toolbar">
+                <select id="subs-status-filter">
+                    <option value="">Все статусы</option>
+                    <option value="active">active</option>
+                    <option value="expiring">expiring</option>
+                    <option value="expired">expired</option>
+                    <option value="cancelled">cancelled</option>
+                    <option value="pending">pending</option>
+                </select>
+                <button id="subs-refresh" class="btn">Обновить</button>
+            </div>
+            <div id="subs-table"></div>
+        </div>
+
+        <div id="tab-payments" class="tab-content">
+            <div class="toolbar">
+                <button id="payments-refresh" class="btn">Обновить</button>
+            </div>
+            <div id="payments-table"></div>
+        </div>
+
+        <div id="tab-plans" class="tab-content">
+            <div class="toolbar">
+                <button id="plans-refresh" class="btn">Обновить</button>
+                <button id="plan-create-btn" class="btn">Добавить тариф</button>
+            </div>
+            <div id="plans-table"></div>
+        </div>
+    </section>
+</div>
+
+<script src="./app.js" type="module"></script>
+</body>
+</html>

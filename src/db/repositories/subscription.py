@@ -273,3 +273,179 @@ async def get_all(
                 offset,
             )
         return [dict(r) for r in rows]
+
+
+async def get_detail(subscription_id: int) -> dict | None:
+    """Возвращает детальную информацию о подписке.
+
+    Args:
+        subscription_id: ID подписки.
+
+    Returns:
+        Подписка с данными пользователя, ноды и плана.
+    """
+    async with acquire() as conn:
+        row = await conn.fetchrow(
+            """
+            SELECT s.*, u.telegram_id, u.username, u.first_name,
+                   n.name AS node_name, n.host AS node_host, n.port AS node_port,
+                   n.socks5_port, n.country, n.country_flag,
+                   p.name AS plan_name, p.duration_days, p.price_usd
+            FROM subscriptions s
+            JOIN users u ON u.id = s.user_id
+            JOIN nodes n ON n.id = s.node_id
+            JOIN plans p ON p.id = s.plan_id
+            WHERE s.id = $1
+            """,
+            subscription_id,
+        )
+        return dict(row) if row else None
+
+
+async def get_by_user(user_id: int, *, limit: int = 100, offset: int = 0) -> list[dict]:
+    """Возвращает подписки пользователя.
+
+    Args:
+        user_id: ID пользователя.
+        limit: Лимит записей.
+        offset: Смещение.
+
+    Returns:
+        Список подписок пользователя.
+    """
+    async with acquire() as conn:
+        rows = await conn.fetch(
+            """
+            SELECT s.*, n.name AS node_name, p.name AS plan_name
+            FROM subscriptions s
+            JOIN nodes n ON n.id = s.node_id
+            JOIN plans p ON p.id = s.plan_id
+            WHERE s.user_id = $1
+            ORDER BY s.created_at DESC
+            LIMIT $2 OFFSET $3
+            """,
+            user_id,
+            limit,
+            offset,
+        )
+        return [dict(r) for r in rows]
+
+
+async def get_by_node(node_id: int, *, limit: int = 100, offset: int = 0) -> list[dict]:
+    """Возвращает подписки, привязанные к ноде.
+
+    Args:
+        node_id: ID ноды.
+        limit: Лимит записей.
+        offset: Смещение.
+
+    Returns:
+        Список подписок ноды.
+    """
+    async with acquire() as conn:
+        rows = await conn.fetch(
+            """
+            SELECT s.*, u.telegram_id, u.username, p.name AS plan_name
+            FROM subscriptions s
+            JOIN users u ON u.id = s.user_id
+            JOIN plans p ON p.id = s.plan_id
+            WHERE s.node_id = $1
+            ORDER BY s.created_at DESC
+            LIMIT $2 OFFSET $3
+            """,
+            node_id,
+            limit,
+            offset,
+        )
+        return [dict(r) for r in rows]
+
+
+async def update_subscription(
+    subscription_id: int,
+    *,
+    plan_id: int,
+    node_id: int,
+    status: str,
+) -> dict | None:
+    """Обновляет базовые поля подписки.
+
+    Args:
+        subscription_id: ID подписки.
+        plan_id: Новый план.
+        node_id: Новая нода.
+        status: Новый статус.
+
+    Returns:
+        Обновлённая подписка или None.
+    """
+    async with acquire() as conn:
+        row = await conn.fetchrow(
+            """
+            UPDATE subscriptions
+            SET plan_id = $1, node_id = $2, status = $3::subscription_status
+            WHERE id = $4
+            RETURNING *
+            """,
+            plan_id,
+            node_id,
+            status,
+            subscription_id,
+        )
+        return dict(row) if row else None
+
+
+async def extend_expiration(subscription_id: int, *, days: int) -> dict | None:
+    """Продлевает подписку на указанное число дней.
+
+    Args:
+        subscription_id: ID подписки.
+        days: Количество дней продления.
+
+    Returns:
+        Обновлённая подписка или None.
+    """
+    async with acquire() as conn:
+        row = await conn.fetchrow(
+            """
+            UPDATE subscriptions
+            SET expires_at = expires_at + make_interval(days => $1)
+            WHERE id = $2
+            RETURNING *
+            """,
+            days,
+            subscription_id,
+        )
+        return dict(row) if row else None
+
+
+async def set_node(subscription_id: int, *, node_id: int) -> dict | None:
+    """Переназначает подписку на другую ноду.
+
+    Args:
+        subscription_id: ID подписки.
+        node_id: ID новой ноды.
+
+    Returns:
+        Обновлённая подписка или None.
+    """
+    async with acquire() as conn:
+        row = await conn.fetchrow(
+            "UPDATE subscriptions SET node_id = $1 WHERE id = $2 RETURNING *",
+            node_id,
+            subscription_id,
+        )
+        return dict(row) if row else None
+
+
+async def delete_subscription(subscription_id: int) -> bool:
+    """Удаляет подписку.
+
+    Args:
+        subscription_id: ID подписки.
+
+    Returns:
+        True, если запись удалена.
+    """
+    async with acquire() as conn:
+        result = await conn.execute("DELETE FROM subscriptions WHERE id = $1", subscription_id)
+        return result.endswith("1")

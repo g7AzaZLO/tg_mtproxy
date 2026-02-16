@@ -90,7 +90,6 @@ async def detail_socks5(
     Args:
         callback: Callback-запрос.
         callback_data: Данные callback с subscription_id.
-        subscription_service: Сервис подписок.
         db_user: Данные пользователя из БД.
     """
     sub = await repo.subscription.get_by_id(callback_data.subscription_id)

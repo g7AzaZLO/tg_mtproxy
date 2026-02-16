@@ -1,9 +1,5 @@
 """Репозиторий пользователей — raw SQL запросы через asyncpg."""
 
-from datetime import datetime
-
-import asyncpg
-
 from src.db.pool import acquire
 
 
@@ -156,3 +152,57 @@ async def search_by_username(query: str, limit: int = 20) -> list[dict]:
             limit,
         )
         return [dict(r) for r in rows]
+
+
+async def update_user(
+    user_id: int,
+    *,
+    username: str | None,
+    first_name: str | None,
+    is_banned: bool,
+    used_trial: bool,
+) -> dict | None:
+    """Обновляет профиль пользователя.
+
+    Args:
+        user_id: Внутренний ID пользователя.
+        username: Новый username.
+        first_name: Новое имя.
+        is_banned: Флаг блокировки.
+        used_trial: Флаг использованного триала.
+
+    Returns:
+        Обновлённый пользователь или None, если не найден.
+    """
+    async with acquire() as conn:
+        row = await conn.fetchrow(
+            """
+            UPDATE users
+            SET username = $1,
+                first_name = $2,
+                is_banned = $3,
+                used_trial = $4
+            WHERE id = $5
+            RETURNING *
+            """,
+            username,
+            first_name,
+            is_banned,
+            used_trial,
+            user_id,
+        )
+        return dict(row) if row else None
+
+
+async def delete_user(user_id: int) -> bool:
+    """Удаляет пользователя по ID.
+
+    Args:
+        user_id: Внутренний ID пользователя.
+
+    Returns:
+        True, если пользователь был удалён.
+    """
+    async with acquire() as conn:
+        result = await conn.execute("DELETE FROM users WHERE id = $1", user_id)
+        return result.endswith("1")

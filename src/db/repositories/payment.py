@@ -223,3 +223,117 @@ async def get_revenue_stats() -> dict:
             """
         )
         return dict(row)
+
+
+async def get_all(
+    *,
+    limit: int = 50,
+    offset: int = 0,
+    status: str | None = None,
+    user_id: int | None = None,
+) -> list[dict]:
+    """Возвращает список платежей с фильтрацией.
+
+    Args:
+        limit: Лимит записей.
+        offset: Смещение.
+        status: Фильтр по статусу.
+        user_id: Фильтр по пользователю.
+
+    Returns:
+        Список платежей с названием плана и ноды.
+    """
+    query = """
+        SELECT p.*, pl.name AS plan_name, n.name AS node_name, u.username
+        FROM payments p
+        JOIN plans pl ON pl.id = p.plan_id
+        LEFT JOIN nodes n ON n.id = p.node_id
+        LEFT JOIN users u ON u.id = p.user_id
+        WHERE ($1::payment_status IS NULL OR p.status = $1::payment_status)
+          AND ($2::bigint IS NULL OR p.user_id = $2)
+        ORDER BY p.created_at DESC
+        LIMIT $3 OFFSET $4
+    """
+    async with acquire() as conn:
+        rows = await conn.fetch(query, status, user_id, limit, offset)
+        return [dict(r) for r in rows]
+
+
+async def get_detail(payment_id: int) -> dict | None:
+    """Возвращает детальную информацию о платеже.
+
+    Args:
+        payment_id: ID платежа.
+
+    Returns:
+        Данные платежа с JOIN полями или None.
+    """
+    async with acquire() as conn:
+        row = await conn.fetchrow(
+            """
+            SELECT p.*, pl.name AS plan_name, pl.duration_days,
+                   n.name AS node_name, n.country,
+                   u.telegram_id, u.username
+            FROM payments p
+            JOIN plans pl ON pl.id = p.plan_id
+            LEFT JOIN nodes n ON n.id = p.node_id
+            LEFT JOIN users u ON u.id = p.user_id
+            WHERE p.id = $1
+            """,
+            payment_id,
+        )
+        return dict(row) if row else None
+
+
+async def update_payment(
+    payment_id: int,
+    *,
+    amount_usd: float,
+    status: str,
+    node_id: int | None,
+    access_type: str,
+) -> dict | None:
+    """Обновляет платёж.
+
+    Args:
+        payment_id: ID платежа.
+        amount_usd: Новая сумма.
+        status: Новый статус.
+        node_id: ID ноды или None.
+        access_type: Тип доступа.
+
+    Returns:
+        Обновлённый платёж или None.
+    """
+    async with acquire() as conn:
+        row = await conn.fetchrow(
+            """
+            UPDATE payments
+            SET amount_usd = $1,
+                status = $2::payment_status,
+                node_id = $3,
+                access_type = $4
+            WHERE id = $5
+            RETURNING *
+            """,
+            amount_usd,
+            status,
+            node_id,
+            access_type,
+            payment_id,
+        )
+        return dict(row) if row else None
+
+
+async def delete_payment(payment_id: int) -> bool:
+    """Удаляет платёж.
+
+    Args:
+        payment_id: ID платежа.
+
+    Returns:
+        True, если платёж удалён.
+    """
+    async with acquire() as conn:
+        result = await conn.execute("DELETE FROM payments WHERE id = $1", payment_id)
+        return result.endswith("1")
