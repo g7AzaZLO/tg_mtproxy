@@ -12,6 +12,7 @@ from src.bot.callbacks.factories import (
     LocationCallback,
     MyProxiesCallback,
     PlanCallback,
+    ProxyTypeCallback,
     RotateCallback,
 )
 
@@ -41,11 +42,43 @@ def main_menu_keyboard() -> InlineKeyboardMarkup:
     return builder.as_markup()
 
 
-def locations_keyboard(countries: list[dict]) -> InlineKeyboardMarkup:
+def proxy_type_keyboard() -> InlineKeyboardMarkup:
+    """Клавиатура выбора типа прокси (MTProto / SOCKS5).
+
+    Returns:
+        Клавиатура с кнопками выбора типа.
+    """
+    builder = InlineKeyboardBuilder()
+    builder.row(
+        InlineKeyboardButton(
+            text="🔒 MTProto Proxy",
+            callback_data=ProxyTypeCallback(proxy_type="mtproto").pack(),
+        )
+    )
+    builder.row(
+        InlineKeyboardButton(
+            text="🧦 SOCKS5 Proxy",
+            callback_data=ProxyTypeCallback(proxy_type="socks5").pack(),
+        )
+    )
+    builder.row(
+        InlineKeyboardButton(
+            text="« Назад",
+            callback_data=BackCallback(to="main").pack(),
+        )
+    )
+    return builder.as_markup()
+
+
+def locations_keyboard(
+    countries: list[dict],
+    proxy_type: str = "mtproto",
+) -> InlineKeyboardMarkup:
     """Клавиатура выбора локации (страны).
 
     Args:
         countries: Список словарей с полями country и country_flag.
+        proxy_type: Тип прокси для передачи в callback.
 
     Returns:
         Клавиатура с кнопками стран.
@@ -56,13 +89,16 @@ def locations_keyboard(countries: list[dict]) -> InlineKeyboardMarkup:
         builder.row(
             InlineKeyboardButton(
                 text=text,
-                callback_data=LocationCallback(country=item["country"]).pack(),
+                callback_data=LocationCallback(
+                    country=item["country"],
+                    proxy_type=proxy_type,
+                ).pack(),
             )
         )
     builder.row(
         InlineKeyboardButton(
             text="« Назад",
-            callback_data=BackCallback(to="main").pack(),
+            callback_data=BackCallback(to="proxy_type").pack(),
         )
     )
     return builder.as_markup()
@@ -73,6 +109,7 @@ def plans_keyboard(
     country: str,
     *,
     show_trial: bool = False,
+    proxy_type: str = "mtproto",
 ) -> InlineKeyboardMarkup:
     """Клавиатура выбора тарифного плана.
 
@@ -80,6 +117,7 @@ def plans_keyboard(
         plans: Список тарифных планов.
         country: Выбранная страна (для передачи в callback).
         show_trial: Показывать ли пробный тариф.
+        proxy_type: Тип прокси.
 
     Returns:
         Клавиатура с кнопками планов.
@@ -96,6 +134,7 @@ def plans_keyboard(
                 callback_data=PlanCallback(
                     plan_id=plan["id"],
                     country=country,
+                    proxy_type=proxy_type,
                 ).pack(),
             )
         )
@@ -111,12 +150,14 @@ def plans_keyboard(
 def confirm_purchase_keyboard(
     plan_id: int,
     node_id: int,
+    proxy_type: str = "mtproto",
 ) -> InlineKeyboardMarkup:
     """Клавиатура подтверждения покупки.
 
     Args:
         plan_id: ID тарифного плана.
         node_id: ID выбранной ноды.
+        proxy_type: Тип прокси.
 
     Returns:
         Клавиатура с кнопками подтверждения и отмены.
@@ -128,6 +169,7 @@ def confirm_purchase_keyboard(
             callback_data=ConfirmPurchaseCallback(
                 plan_id=plan_id,
                 node_id=node_id,
+                proxy_type=proxy_type,
             ).pack(),
         ),
     )
@@ -162,19 +204,21 @@ def payment_keyboard(payment_link: str) -> InlineKeyboardMarkup:
     return builder.as_markup()
 
 
-def proxy_link_keyboard(tg_link: str) -> InlineKeyboardMarkup:
+def proxy_link_keyboard(link: str, access_type: str = "mtproto") -> InlineKeyboardMarkup:
     """Клавиатура с кнопкой подключения прокси.
 
     Args:
-        tg_link: Deep-link tg://proxy?...
+        link: Ссылка для подключения (https://t.me/proxy для MTProto).
+        access_type: Тип прокси.
 
     Returns:
         Клавиатура с кнопкой-ссылкой для автоподключения.
     """
     builder = InlineKeyboardBuilder()
-    builder.row(
-        InlineKeyboardButton(text="Подключить прокси", url=tg_link),
-    )
+    if access_type == "mtproto":
+        builder.row(
+            InlineKeyboardButton(text="Подключить прокси", url=link),
+        )
     builder.row(
         InlineKeyboardButton(
             text="Мои прокси",
@@ -187,8 +231,8 @@ def proxy_link_keyboard(tg_link: str) -> InlineKeyboardMarkup:
 def my_proxies_keyboard(subscriptions: list[dict]) -> InlineKeyboardMarkup:
     """Клавиатура со списком активных прокси пользователя.
 
-    Для каждой подписки: кнопка-ссылка на подключение
-    и кнопка «Сменить ключ» для ротации секрета / смены локации.
+    Для каждой подписки: кнопка-ссылка на подключение (MTProto)
+    или текстовая кнопка (SOCKS5), и кнопка «Сменить ключ».
 
     Args:
         subscriptions: Список активных подписок.
@@ -201,12 +245,26 @@ def my_proxies_keyboard(subscriptions: list[dict]) -> InlineKeyboardMarkup:
         flag = sub.get("country_flag", "")
         name = sub.get("node_name", "Сервер")
         expires = sub["expires_at"].strftime("%d.%m.%Y")
-        builder.row(
-            InlineKeyboardButton(
-                text=f"{flag} {name} (до {expires})",
-                url=sub["https_link"],
+        access_type = sub.get("access_type", "mtproto")
+        type_icon = "🧦" if access_type == "socks5" else "🔒"
+
+        if access_type == "socks5":
+            builder.row(
+                InlineKeyboardButton(
+                    text=f"{type_icon} {flag} {name} (до {expires})",
+                    callback_data=MyProxiesCallback(
+                        action="detail_socks5",
+                        subscription_id=sub["id"],
+                    ).pack(),
+                )
             )
-        )
+        else:
+            builder.row(
+                InlineKeyboardButton(
+                    text=f"{type_icon} {flag} {name} (до {expires})",
+                    url=sub["https_link"],
+                )
+            )
         builder.row(
             InlineKeyboardButton(
                 text="🔄 Сменить ключ",
@@ -216,6 +274,28 @@ def my_proxies_keyboard(subscriptions: list[dict]) -> InlineKeyboardMarkup:
                 ).pack(),
             )
         )
+    builder.row(
+        InlineKeyboardButton(
+            text="« Главное меню",
+            callback_data=BackCallback(to="main").pack(),
+        )
+    )
+    return builder.as_markup()
+
+
+def socks5_credentials_keyboard() -> InlineKeyboardMarkup:
+    """Клавиатура для экрана SOCKS5-credentials.
+
+    Returns:
+        Клавиатура с кнопками навигации.
+    """
+    builder = InlineKeyboardBuilder()
+    builder.row(
+        InlineKeyboardButton(
+            text="Мои прокси",
+            callback_data=MyProxiesCallback(action="list").pack(),
+        ),
+    )
     builder.row(
         InlineKeyboardButton(
             text="« Главное меню",

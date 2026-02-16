@@ -16,6 +16,8 @@ async def create(
     secret: str,
     duration_days: int,
     is_trial: bool = False,
+    access_type: str = "mtproto",
+    marzban_username: str | None = None,
 ) -> dict:
     """Создаёт новую подписку в рамках существующей транзакции.
 
@@ -24,10 +26,11 @@ async def create(
         user_id: Внутренний ID пользователя.
         node_id: ID ноды.
         plan_id: ID тарифного плана.
-        secret: Сгенерированный dd-секрет.
+        secret: Сгенерированный dd-секрет (пустая строка для SOCKS5).
         duration_days: Длительность подписки в днях.
-        is_trial: Пробная подписка — сразу помечается как notified_3d,
-            чтобы не получать бессмысленное уведомление «осталось 3 дня».
+        is_trial: Пробная подписка — сразу помечается как notified_3d.
+        access_type: Тип доступа — ``mtproto`` или ``socks5``.
+        marzban_username: Username в Marzban (только для socks5).
 
     Returns:
         Словарь с данными созданной подписки.
@@ -37,8 +40,9 @@ async def create(
 
     row = await conn.fetchrow(
         "INSERT INTO subscriptions "
-        "(user_id, node_id, plan_id, secret, starts_at, expires_at, status, notified_3d) "
-        "VALUES ($1, $2, $3, $4, $5, $6, 'active', $7) RETURNING *",
+        "(user_id, node_id, plan_id, secret, starts_at, expires_at, "
+        "status, notified_3d, access_type, marzban_username) "
+        "VALUES ($1, $2, $3, $4, $5, $6, 'active', $7, $8, $9) RETURNING *",
         user_id,
         node_id,
         plan_id,
@@ -46,6 +50,8 @@ async def create(
         now,
         expires_at,
         is_trial,
+        access_type,
+        marzban_username,
     )
     return dict(row)
 

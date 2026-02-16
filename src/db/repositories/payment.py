@@ -14,6 +14,7 @@ async def create(
     plan_id: int,
     node_id: int,
     amount_usd: float,
+    access_type: str = "mtproto",
 ) -> dict:
     """Создаёт запись о платеже в рамках существующего соединения.
 
@@ -23,17 +24,19 @@ async def create(
         plan_id: ID тарифного плана.
         node_id: ID выбранной ноды.
         amount_usd: Сумма в USD.
+        access_type: Тип доступа — ``mtproto`` или ``socks5``.
 
     Returns:
         Словарь с данными созданного платежа.
     """
     row = await conn.fetchrow(
-        "INSERT INTO payments (user_id, plan_id, node_id, amount_usd) "
-        "VALUES ($1, $2, $3, $4) RETURNING *",
+        "INSERT INTO payments (user_id, plan_id, node_id, amount_usd, access_type) "
+        "VALUES ($1, $2, $3, $4, $5) RETURNING *",
         user_id,
         plan_id,
         node_id,
         amount_usd,
+        access_type,
     )
     return dict(row)
 

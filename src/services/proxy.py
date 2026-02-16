@@ -1,5 +1,7 @@
 """Сервис прокси — генерация секретов и формирование сообщений."""
 
+from html import escape
+
 from src.utils.crypto import build_proxy_link, build_proxy_link_https, generate_secret
 
 
@@ -48,7 +50,7 @@ def format_proxy_message(
     tg_link: str,
     https_link: str,
 ) -> str:
-    """Формирует сообщение с параметрами активированного прокси.
+    """Формирует сообщение с параметрами активированного MTProto-прокси.
 
     Args:
         node_name: Имя ноды.
@@ -69,5 +71,46 @@ def format_proxy_message(
         f"Действует до: <b>{expires_at}</b>\n\n"
         "Нажмите кнопку ниже для автоматического подключения, "
         "или скопируйте ссылку:\n\n"
-        f"<code>{https_link}</code>"
+        f"<code>{escape(https_link)}</code>"
+    )
+
+
+def format_socks5_message(
+    *,
+    node_name: str,
+    country_flag: str,
+    plan_name: str,
+    expires_at: str,
+    host: str,
+    port: int,
+    username: str,
+    password: str,
+) -> str:
+    """Формирует сообщение с данными SOCKS5-прокси.
+
+    Args:
+        node_name: Имя ноды.
+        country_flag: Флаг страны ноды.
+        plan_name: Название тарифа.
+        expires_at: Дата окончания подписки.
+        host: IP-адрес сервера.
+        port: Порт SOCKS5.
+        username: Логин.
+        password: Пароль.
+
+    Returns:
+        Готовый HTML-текст для отправки пользователю.
+    """
+    return (
+        f"{country_flag} <b>SOCKS5 прокси готов!</b>\n\n"
+        f"Сервер: <b>{node_name}</b>\n"
+        f"Тариф: <b>{plan_name}</b>\n"
+        f"Действует до: <b>{expires_at}</b>\n\n"
+        f"<b>Данные для подключения:</b>\n"
+        f"Хост: <code>{escape(host)}</code>\n"
+        f"Порт: <code>{port}</code>\n"
+        f"Логин: <code>{escape(username)}</code>\n"
+        f"Пароль: <code>{escape(password)}</code>\n\n"
+        "<i>Скопируйте данные и добавьте в настройки прокси "
+        "Telegram (Настройки → Данные и память → Прокси).</i>"
     )

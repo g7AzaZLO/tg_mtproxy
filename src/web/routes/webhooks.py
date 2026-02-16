@@ -15,7 +15,7 @@ from starlette import status as http_status
 
 from src.config import Settings
 from src.db import repositories as repo
-from src.services.proxy import format_proxy_message
+from src.services.proxy import format_proxy_message, format_socks5_message
 from src.services.subscription import SubscriptionService
 
 logger = logging.getLogger(__name__)
@@ -192,6 +192,8 @@ async def _activate_from_payment(
         logger.error("План не найден для payment_id=%d", payment["id"])
         return None
 
+    access_type = payment.get("access_type", "mtproto")
+
     result = await subscription_service.activate_subscription(
         payment_id=payment["id"],
         user_id=payment["user_id"],
@@ -199,6 +201,7 @@ async def _activate_from_payment(
         node_id=node_id,
         duration_days=plan["duration_days"],
         is_trial=plan["is_trial"],
+        access_type=access_type,
     )
     return result
 
@@ -226,18 +229,35 @@ async def _notify_user(
     plan = await repo.plan.get_by_id(payment["plan_id"])
     plan_name = plan["name"] if plan else "—"
 
-    text = format_proxy_message(
-        node_name=subscription_data.get("node_name", "Сервер"),
-        country_flag=subscription_data.get("country_flag", ""),
-        plan_name=plan_name,
-        expires_at=subscription_data["expires_at"].strftime("%d.%m.%Y %H:%M"),
-        tg_link=subscription_data["tg_link"],
-        https_link=subscription_data["https_link"],
-    )
+    access_type = subscription_data.get("access_type", "mtproto")
 
-    keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="Подключить прокси", url=subscription_data["tg_link"])],
-    ])
+    if access_type == "socks5" and subscription_data.get("socks5_host"):
+        text = format_socks5_message(
+            node_name=subscription_data.get("node_name", "Сервер"),
+            country_flag=subscription_data.get("country_flag", ""),
+            plan_name=plan_name,
+            expires_at=subscription_data["expires_at"].strftime("%d.%m.%Y %H:%M"),
+            host=subscription_data["socks5_host"],
+            port=subscription_data["socks5_port"],
+            username=subscription_data["socks5_username"],
+            password=subscription_data["socks5_password"],
+        )
+        keyboard = None
+    else:
+        text = format_proxy_message(
+            node_name=subscription_data.get("node_name", "Сервер"),
+            country_flag=subscription_data.get("country_flag", ""),
+            plan_name=plan_name,
+            expires_at=subscription_data["expires_at"].strftime("%d.%m.%Y %H:%M"),
+            tg_link=subscription_data.get("tg_link", ""),
+            https_link=subscription_data.get("https_link", ""),
+        )
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(
+                text="Подключить прокси",
+                url=subscription_data.get("https_link", ""),
+            )],
+        ])
 
     try:
         await bot.send_message(

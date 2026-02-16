@@ -586,6 +586,130 @@ journalctl -u node-agent -n 80 --no-pager
 ```
 
 
+## Миграция 003: поддержка SOCKS5
+
+На основном сервере:
+
+```bash
+docker compose exec postgres psql -U mtproxy -d mtproxy -f /dev/stdin < migrations/003_add_socks5_support.sql
+```
+
+Или вручную:
+
+```bash
+docker compose exec postgres psql -U mtproxy -d mtproxy
+```
+
+```sql
+ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS access_type VARCHAR(20) NOT NULL DEFAULT 'mtproto';
+ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS marzban_username VARCHAR(100);
+ALTER TABLE payments ADD COLUMN IF NOT EXISTS access_type VARCHAR(20) NOT NULL DEFAULT 'mtproto';
+ALTER TABLE nodes ADD COLUMN IF NOT EXISTS socks5_inbound_tag VARCHAR(100);
+ALTER TABLE nodes ADD COLUMN IF NOT EXISTS socks5_port INTEGER DEFAULT 1080;
+\q
+```
+
+---
+
+## Часть 5: Marzban (SOCKS5 прокси)
+
+### 5.1. Marzban Panel (основной сервер)
+
+Marzban Panel устанавливается на основной сервер рядом с ботом.
+
+```bash
+# Установка через официальный скрипт
+sudo bash -c "$(curl -sL https://github.com/Gozargah/Marzban/raw/master/script.sh)" @ install
+```
+
+Панель будет доступна на порту `8000`. Задайте логин/пароль admin при первом входе.
+
+Добавить в `.env` бота:
+
+```
+MARZBAN_BASE_URL=http://localhost:8000
+MARZBAN_ADMIN_USERNAME=admin
+MARZBAN_ADMIN_PASSWORD=ваш_пароль_marzban
+```
+
+Перезапустить бот: `systemctl restart mtproxy-bot`
+
+### 5.2. Marzban Node (на каждой ноде с SOCKS5)
+
+На каждой ноде, где нужен SOCKS5:
+
+```bash
+# Установка Marzban Node
+sudo bash -c "$(curl -sL https://github.com/Gozargah/Marzban-node/raw/master/script.sh)" @ install
+```
+
+Получить TLS-сертификат ноды (на Marzban Panel):
+1. Зайти в Web UI панели: `https://ваш_домен.com:8000/dashboard`
+2. Settings → Nodes → Add New Node
+3. Скопировать сертификат ноды
+4. Указать IP и порт ноды (по умолчанию 62050)
+
+На ноде — вставить сертификат:
+
+```bash
+nano /var/lib/marzban-node/ssl_client_cert.pem
+# Вставить содержимое сертификата из панели
+```
+
+Перезапустить Marzban Node:
+
+```bash
+systemctl restart marzban-node
+```
+
+### 5.3. Настройка SOCKS5 Inbound
+
+В Web UI Marzban Panel:
+1. Settings → Inbounds → Add Inbound
+2. Тип: **SOCKS**
+3. Tag: например `socks-de-1` (уникальный для каждой ноды)
+4. Listen: `0.0.0.0`
+5. Port: `1080` (или другой свободный)
+6. Привязать к нужной ноде
+
+### 5.4. Настройка Host
+
+В Web UI: Settings → Hosts → добавить host для SOCKS-inbound:
+- Remark: `{USERNAME}`
+- Address: `IP_НОДЫ`
+- Port: `1080`
+- Это нужно чтобы Marzban формировал ссылки с правильным IP
+
+### 5.5. Файрвол на ноде
+
+```bash
+# SOCKS5 порт — открыт всем
+ufw allow 1080/tcp
+
+# Marzban Node API — ТОЛЬКО для основного сервера
+ufw allow from IP_ОСНОВНОГО_СЕРВЕРА to any port 62050
+```
+
+### 5.6. Регистрация SOCKS5 на ноде в БД
+
+```bash
+docker compose exec postgres psql -U mtproxy -d mtproxy -c "
+UPDATE nodes
+SET socks5_inbound_tag = 'socks-de-1', socks5_port = 1080
+WHERE name = 'DE-1';
+"
+```
+
+После этого при покупке типа SOCKS5 бот будет создавать пользователей через Marzban API.
+
+### 5.7. Проверка
+
+В боте: «Купить прокси» → «SOCKS5 Proxy» → выбрать локацию → выбрать тариф → подтвердить.
+
+Пользователь получит: хост, порт, логин, пароль.
+
+---
+
 ## Замена TLS_DOMAIN
 Проверка пингов
 ```bash

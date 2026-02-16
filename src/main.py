@@ -22,6 +22,7 @@ from src.bot.handlers.admin import set_admin_ids
 from src.bot.middlewares.throttle import BanCheckMiddleware, ThrottleMiddleware, UserMiddleware
 from src.config import get_settings
 from src.db.pool import close_pool, init_pool
+from src.services.marzban import MarzbanService
 from src.services.node_manager import NodeManagerService
 from src.services.payment import PaymentService
 from src.services.scheduler import create_scheduler
@@ -51,7 +52,12 @@ async def main() -> None:
     # === Сервисы ===
     node_manager = NodeManagerService()
     payment_service = PaymentService(settings.cryptocloud)
-    subscription_service = SubscriptionService(node_manager)
+    marzban_service = (
+        MarzbanService(settings.marzban)
+        if settings.marzban.admin_password
+        else None
+    )
+    subscription_service = SubscriptionService(node_manager, marzban=marzban_service)
 
     # === Telegram Bot ===
     bot = Bot(
@@ -118,6 +124,8 @@ async def main() -> None:
     finally:
         scheduler.shutdown(wait=False)
         await payment_service.close()
+        if marzban_service:
+            await marzban_service.close()
         await close_pool()
         await bot.session.close()
         logger.info("Приложение остановлено")

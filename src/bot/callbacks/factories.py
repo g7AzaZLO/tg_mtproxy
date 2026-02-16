@@ -7,14 +7,26 @@
 from aiogram.filters.callback_data import CallbackData
 
 
+class ProxyTypeCallback(CallbackData, prefix="ptype"):
+    """Выбор типа прокси (MTProto / SOCKS5).
+
+    Attributes:
+        proxy_type: Тип прокси — ``mtproto`` или ``socks5``.
+    """
+
+    proxy_type: str
+
+
 class LocationCallback(CallbackData, prefix="loc"):
     """Выбор локации (страны) для прокси.
 
     Attributes:
         country: Название страны.
+        proxy_type: Тип прокси.
     """
 
     country: str
+    proxy_type: str = "mtproto"
 
 
 class PlanCallback(CallbackData, prefix="plan"):
@@ -23,10 +35,12 @@ class PlanCallback(CallbackData, prefix="plan"):
     Attributes:
         plan_id: ID тарифного плана.
         country: Выбранная страна.
+        proxy_type: Тип прокси.
     """
 
     plan_id: int
     country: str
+    proxy_type: str = "mtproto"
 
 
 class ConfirmPurchaseCallback(CallbackData, prefix="buy"):
@@ -35,18 +49,20 @@ class ConfirmPurchaseCallback(CallbackData, prefix="buy"):
     Attributes:
         plan_id: ID тарифного плана.
         node_id: ID выбранной ноды.
+        proxy_type: Тип прокси.
     """
 
     plan_id: int
     node_id: int
+    proxy_type: str = "mtproto"
 
 
 class MyProxiesCallback(CallbackData, prefix="proxy"):
     """Навигация в разделе «Мои прокси».
 
     Attributes:
-        action: Действие (list, detail, refresh).
-        subscription_id: ID подписки (для detail).
+        action: Действие (list, detail, refresh, rotate).
+        subscription_id: ID подписки (для detail / rotate).
     """
 
     action: str
