@@ -112,20 +112,13 @@ class Socks5Manager:
             True при успешном перезапуске.
         """
         try:
+            # 3proxy не поддерживает reload — только restart
             result = subprocess.run(
-                ["systemctl", "reload", "3proxy"],
+                ["systemctl", "restart", "3proxy"],
                 capture_output=True,
                 text=True,
                 check=False,
             )
-            if result.returncode != 0:
-                # reload может не поддерживаться, пробуем restart
-                result = subprocess.run(
-                    ["systemctl", "restart", "3proxy"],
-                    capture_output=True,
-                    text=True,
-                    check=False,
-                )
             if result.returncode == 0:
                 logger.info("3proxy перезагружен")
                 return True

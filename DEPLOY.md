@@ -620,7 +620,20 @@ SOCKS5 реализован через легковесный 3proxy на каж
 Повторяется для каждой ноды, где нужен SOCKS5.
 
 ```bash
-apt update && apt install -y 3proxy
+apt install -y git build-essential
+
+git clone https://github.com/3proxy/3proxy.git
+cd 3proxy
+make -f Makefile.Linux
+
+# 1) Установить только бинарники (со strip)
+install -m 0755 -d /usr/local/bin
+install -m 0755 -s \
+  bin/3proxy bin/ftppr bin/mycrypt bin/pop3p bin/proxy bin/socks bin/tcppm bin/udppm \
+  /usr/local/bin
+
+# 2) Установить скрипт без strip
+install -m 0755 scripts/add3proxyuser.sh /usr/local/bin/add3proxyuser.sh
 ```
 
 ### 5.2. Конфигурация 3proxy
@@ -660,7 +673,7 @@ After=network.target
 
 [Service]
 Type=simple
-ExecStart=/usr/bin/3proxy /opt/3proxy/3proxy.cfg
+ExecStart=/usr/local/bin/3proxy /opt/3proxy/3proxy.cfg
 Restart=always
 RestartSec=5
 
