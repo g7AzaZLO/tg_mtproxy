@@ -604,7 +604,6 @@ docker compose exec postgres psql -U mtproxy -d mtproxy
 ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS access_type VARCHAR(20) NOT NULL DEFAULT 'mtproto';
 ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS marzban_username VARCHAR(100);
 ALTER TABLE payments ADD COLUMN IF NOT EXISTS access_type VARCHAR(20) NOT NULL DEFAULT 'mtproto';
-ALTER TABLE nodes ADD COLUMN IF NOT EXISTS socks5_inbound_tag VARCHAR(100);
 ALTER TABLE nodes ADD COLUMN IF NOT EXISTS socks5_port INTEGER DEFAULT 1080;
 \q
 ```

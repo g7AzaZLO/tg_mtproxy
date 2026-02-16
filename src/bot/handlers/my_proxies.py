@@ -82,7 +82,6 @@ async def list_proxies(
 async def detail_socks5(
     callback: CallbackQuery,
     callback_data: MyProxiesCallback,
-    subscription_service: SubscriptionService,
     db_user: dict,
 ) -> None:
     """Показывает SOCKS5-credentials для конкретной подписки.
@@ -98,35 +97,29 @@ async def detail_socks5(
         await callback.answer("Подписка не найдена.", show_alert=True)
         return
 
-    if sub.get("access_type") != "socks5" or not sub.get("marzban_username"):
+    if sub.get("access_type") != "socks5":
         await callback.answer("Данные недоступны.", show_alert=True)
-        return
-
-    # Получаем credentials из Marzban через сервис
-    if not subscription_service._marzban:
-        await callback.answer("SOCKS5 не настроен.", show_alert=True)
-        return
-
-    creds = await subscription_service._marzban.get_socks5_credentials(
-        sub["marzban_username"]
-    )
-    if not creds:
-        await callback.answer("Не удалось получить данные.", show_alert=True)
         return
 
     node = await repo.node.get_by_id(sub["node_id"])
     flag = node["country_flag"] if node else ""
     name = node["name"] if node else "Сервер"
+    host = node["host"] if node else ""
+    socks5_port = (node.get("socks5_port") or 1080) if node else 1080
     expires = sub["expires_at"].strftime("%d.%m.%Y %H:%M")
+
+    # username хранится в secret, password в marzban_username
+    username = sub["secret"]
+    password = sub.get("marzban_username", "")
 
     text = (
         f"🧦 <b>SOCKS5 — {flag} {name}</b>\n"
         f"До: <b>{expires}</b>\n\n"
         f"<b>Данные для подключения:</b>\n"
-        f"Хост: <code>{escape(creds.host)}</code>\n"
-        f"Порт: <code>{creds.port}</code>\n"
-        f"Логин: <code>{escape(creds.username)}</code>\n"
-        f"Пароль: <code>{escape(creds.password)}</code>\n\n"
+        f"Хост: <code>{escape(host)}</code>\n"
+        f"Порт: <code>{socks5_port}</code>\n"
+        f"Логин: <code>{escape(username)}</code>\n"
+        f"Пароль: <code>{escape(password)}</code>\n\n"
         "<i>Скопируйте данные и добавьте в настройки прокси "
         "Telegram (Настройки → Данные и память → Прокси).</i>"
     )

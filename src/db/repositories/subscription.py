@@ -30,7 +30,7 @@ async def create(
         duration_days: Длительность подписки в днях.
         is_trial: Пробная подписка — сразу помечается как notified_3d.
         access_type: Тип доступа — ``mtproto`` или ``socks5``.
-        marzban_username: Username в Marzban (только для socks5).
+        marzban_username: Пароль SOCKS5 (хранится в этом поле).
 
     Returns:
         Словарь с данными созданной подписки.

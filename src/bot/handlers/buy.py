@@ -118,15 +118,23 @@ async def select_proxy_type(
 
 @router.callback_query(BackCallback.filter(F.to == "locations"))
 async def back_to_locations(callback: CallbackQuery) -> None:
-    """Возврат к выбору локации (по умолчанию MTProto).
+    """Возврат к выбору типа прокси (из выбора тарифа).
 
     Args:
         callback: Callback-запрос.
     """
-    countries = await repo.node.get_available_countries()
     await callback.message.edit_text(
-        "Выберите локацию прокси-сервера:",
-        reply_markup=locations_keyboard(countries),
+        "<b>Выберите тип прокси:</b>\n\n"
+        "🔒 <b>MTProto</b>\n"
+        "• Внутренний протокол Telegram.\n"
+        "• Высокая надежность и шифрование.\n"
+        "• Рекомендуется для ПК с проводным интернетом.\n"
+        "• <b>Не рекомендуется для использования на телефоне</b> (медленное соединение).\n\n"
+        "🧦 <b>SOCKS5</b>\n"
+        "• Универсальный скоростной протокол.\n"
+        "• Отлично подходит для телефонов и любых устройств.\n"
+        "• Быстрое подключение и высокая скорость.",
+        reply_markup=proxy_type_keyboard(),
         parse_mode="HTML",
     )
     await callback.answer()
