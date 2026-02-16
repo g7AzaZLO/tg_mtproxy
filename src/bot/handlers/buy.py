@@ -26,7 +26,7 @@ from src.bot.keyboards.menus import (
 )
 from src.db import repositories as repo
 from src.services.payment import PaymentError, PaymentService
-from src.services.proxy import format_proxy_message, format_socks5_message
+from src.services.proxy import build_socks5_link, format_proxy_message, format_socks5_message
 from src.services.subscription import SubscriptionService
 
 logger = logging.getLogger(__name__)
@@ -335,6 +335,12 @@ async def _send_activation_message(
     access_type = result.get("access_type", "mtproto")
 
     if access_type == "socks5" and result.get("socks5_host"):
+        socks5_link = result.get("socks5_link") or build_socks5_link(
+            result["socks5_host"],
+            result["socks5_port"],
+            result["socks5_username"],
+            result["socks5_password"],
+        )
         text = format_socks5_message(
             node_name=result["node_name"],
             country_flag=result["country_flag"],
@@ -344,10 +350,11 @@ async def _send_activation_message(
             port=result["socks5_port"],
             username=result["socks5_username"],
             password=result["socks5_password"],
+            socks5_link=socks5_link,
         )
         await callback.message.edit_text(
             text,
-            reply_markup=socks5_credentials_keyboard(),
+            reply_markup=socks5_credentials_keyboard(socks5_link),
             parse_mode="HTML",
         )
     else:

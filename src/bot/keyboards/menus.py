@@ -283,13 +283,23 @@ def my_proxies_keyboard(subscriptions: list[dict]) -> InlineKeyboardMarkup:
     return builder.as_markup()
 
 
-def socks5_credentials_keyboard() -> InlineKeyboardMarkup:
+def socks5_credentials_keyboard(socks5_link: str | None = None) -> InlineKeyboardMarkup:
     """Клавиатура для экрана SOCKS5-credentials.
 
+    Args:
+        socks5_link: Ссылка ``https://t.me/socks?...`` для быстрого подключения.
+
     Returns:
-        Клавиатура с кнопками навигации.
+        Клавиатура с кнопкой подключения и навигацией.
     """
     builder = InlineKeyboardBuilder()
+    if socks5_link:
+        builder.row(
+            InlineKeyboardButton(
+                text="Подключить SOCKS5",
+                url=socks5_link,
+            ),
+        )
     builder.row(
         InlineKeyboardButton(
             text="Мои прокси",

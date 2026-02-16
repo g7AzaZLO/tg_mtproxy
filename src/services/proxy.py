@@ -1,6 +1,7 @@
 """Сервис прокси — генерация секретов и формирование сообщений."""
 
 from html import escape
+from urllib.parse import urlencode
 
 from src.utils.crypto import build_proxy_link, build_proxy_link_https, generate_secret
 
@@ -21,6 +22,29 @@ def create_proxy_credentials(host: str, port: int) -> dict[str, str]:
         "tg_link": build_proxy_link(host, port, secret),
         "https_link": build_proxy_link_https(host, port, secret),
     }
+
+
+def build_socks5_link(host: str, port: int, username: str, password: str) -> str:
+    """Строит HTTPS deep-link Telegram для SOCKS5.
+
+    Args:
+        host: IP-адрес или домен SOCKS5-сервера.
+        port: Порт SOCKS5.
+        username: Логин SOCKS5.
+        password: Пароль SOCKS5.
+
+    Returns:
+        Ссылка формата ``https://t.me/socks?...``.
+    """
+    params = urlencode(
+        {
+            "server": host,
+            "port": port,
+            "user": username,
+            "pass": password,
+        }
+    )
+    return f"https://t.me/socks?{params}"
 
 
 def get_proxy_usage_rules() -> str:
@@ -93,6 +117,7 @@ def format_socks5_message(
     port: int,
     username: str,
     password: str,
+    socks5_link: str | None = None,
 ) -> str:
     """Формирует сообщение с данными SOCKS5-прокси.
 
@@ -105,10 +130,19 @@ def format_socks5_message(
         port: Порт SOCKS5.
         username: Логин.
         password: Пароль.
+        socks5_link: Telegram deep-link для быстрого подключения.
 
     Returns:
         Готовый HTML-текст для отправки пользователю.
     """
+    link_block = ""
+    if socks5_link:
+        link_block = (
+            "\nНажмите кнопку ниже для автоматического подключения, "
+            "или скопируйте ссылку:\n\n"
+            f"<code>{escape(socks5_link)}</code>\n"
+        )
+
     return (
         f"{country_flag} <b>SOCKS5 прокси готов!</b>\n\n"
         f"Сервер: <b>{node_name}</b>\n"
@@ -118,7 +152,8 @@ def format_socks5_message(
         f"Хост: <code>{escape(host)}</code>\n"
         f"Порт: <code>{port}</code>\n"
         f"Логин: <code>{escape(username)}</code>\n"
-        f"Пароль: <code>{escape(password)}</code>\n\n"
+        f"Пароль: <code>{escape(password)}</code>\n"
+        f"{link_block}\n"
         "<i>Скопируйте данные и добавьте в настройки прокси "
         "Telegram (Настройки → Данные и память → Прокси).</i>"
     )

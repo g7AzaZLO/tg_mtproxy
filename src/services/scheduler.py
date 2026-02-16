@@ -240,13 +240,23 @@ async def _send_activation_notification(
         user: Данные пользователя.
         subscription_data: Данные подписки с ссылками.
     """
-    from src.services.proxy import format_proxy_message, format_socks5_message
+    from src.services.proxy import (
+        build_socks5_link,
+        format_proxy_message,
+        format_socks5_message,
+    )
 
     plan = await repo.plan.get_by_id(subscription_data["plan_id"])
     plan_name = plan["name"] if plan else "—"
     access_type = subscription_data.get("access_type", "mtproto")
 
     if access_type == "socks5" and subscription_data.get("socks5_host"):
+        socks5_link = subscription_data.get("socks5_link") or build_socks5_link(
+            subscription_data["socks5_host"],
+            subscription_data["socks5_port"],
+            subscription_data["socks5_username"],
+            subscription_data["socks5_password"],
+        )
         text = format_socks5_message(
             node_name=subscription_data.get("node_name", "Сервер"),
             country_flag=subscription_data.get("country_flag", ""),
@@ -256,8 +266,14 @@ async def _send_activation_notification(
             port=subscription_data["socks5_port"],
             username=subscription_data["socks5_username"],
             password=subscription_data["socks5_password"],
+            socks5_link=socks5_link,
         )
-        keyboard = None
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(
+                text="Подключить SOCKS5",
+                url=socks5_link,
+            )],
+        ])
     else:
         text = format_proxy_message(
             node_name=subscription_data.get("node_name", "Сервер"),

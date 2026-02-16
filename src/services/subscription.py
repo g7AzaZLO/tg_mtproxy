@@ -11,7 +11,7 @@ from datetime import datetime, timedelta, timezone
 from src.db import repositories as repo
 from src.db.pool import acquire, transaction
 from src.services.node_manager import NodeManagerService
-from src.services.proxy import create_proxy_credentials
+from src.services.proxy import build_socks5_link, create_proxy_credentials
 from src.utils.crypto import build_proxy_link, build_proxy_link_https, generate_secret
 
 logger = logging.getLogger(__name__)
@@ -217,6 +217,7 @@ class SubscriptionService:
             "socks5_port": socks5_port,
             "socks5_username": username,
             "socks5_password": password,
+            "socks5_link": build_socks5_link(node["host"], socks5_port, username, password),
         }
 
     # ------------------------------------------------------------------
@@ -411,6 +412,9 @@ class SubscriptionService:
             "socks5_port": socks5_port,
             "socks5_username": new_username,
             "socks5_password": new_password,
+            "socks5_link": build_socks5_link(
+                new_node["host"], socks5_port, new_username, new_password,
+            ),
         }
 
     # ------------------------------------------------------------------
@@ -434,6 +438,12 @@ class SubscriptionService:
                 sub["socks5_port"] = (node.get("socks5_port") or 1080) if node else 1080
                 sub["socks5_username"] = sub["secret"]
                 sub["socks5_password"] = sub.get("marzban_username", "")
+                sub["socks5_link"] = build_socks5_link(
+                    sub["socks5_host"],
+                    sub["socks5_port"],
+                    sub["socks5_username"],
+                    sub["socks5_password"],
+                )
             else:
                 sub["tg_link"] = build_proxy_link(
                     sub["host"], sub["port"], sub["secret"],

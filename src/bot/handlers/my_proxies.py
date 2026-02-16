@@ -15,6 +15,7 @@ from src.bot.keyboards.menus import (
     socks5_credentials_keyboard,
 )
 from src.db import repositories as repo
+from src.services.proxy import build_socks5_link
 from src.services.subscription import SubscriptionService
 
 logger = logging.getLogger(__name__)
@@ -112,6 +113,7 @@ async def detail_socks5(
     username = sub["secret"]
     password = sub.get("marzban_username", "")
 
+    socks5_link = build_socks5_link(host, socks5_port, username, password)
     text = (
         f"🧦 <b>SOCKS5 — {flag} {name}</b>\n"
         f"До: <b>{expires}</b>\n\n"
@@ -120,13 +122,16 @@ async def detail_socks5(
         f"Порт: <code>{socks5_port}</code>\n"
         f"Логин: <code>{escape(username)}</code>\n"
         f"Пароль: <code>{escape(password)}</code>\n\n"
+        "Нажмите кнопку ниже для автоматического подключения, "
+        "или скопируйте ссылку:\n"
+        f"<code>{escape(socks5_link)}</code>\n\n"
         "<i>Скопируйте данные и добавьте в настройки прокси "
         "Telegram (Настройки → Данные и память → Прокси).</i>"
     )
 
     await callback.message.edit_text(
         text,
-        reply_markup=socks5_credentials_keyboard(),
+        reply_markup=socks5_credentials_keyboard(socks5_link),
         parse_mode="HTML",
     )
     await callback.answer()
@@ -226,6 +231,12 @@ async def _show_rotate_success(callback: CallbackQuery, result: dict) -> None:
     access_type = result.get("access_type", "mtproto")
 
     if access_type == "socks5" and result.get("socks5_host"):
+        socks5_link = result.get("socks5_link") or build_socks5_link(
+            result["socks5_host"],
+            result["socks5_port"],
+            result["socks5_username"],
+            result["socks5_password"],
+        )
         text = (
             "✅ <b>SOCKS5 ключ успешно заменён!</b>\n\n"
             f"Сервер: {result['country_flag']} {result['node_name']}\n\n"
@@ -233,12 +244,15 @@ async def _show_rotate_success(callback: CallbackQuery, result: dict) -> None:
             f"Хост: <code>{escape(result['socks5_host'])}</code>\n"
             f"Порт: <code>{result['socks5_port']}</code>\n"
             f"Логин: <code>{escape(result['socks5_username'])}</code>\n"
-            f"Пароль: <code>{escape(result['socks5_password'])}</code>"
+            f"Пароль: <code>{escape(result['socks5_password'])}</code>\n\n"
+            "Нажмите кнопку ниже для автоматического подключения, "
+            "или скопируйте ссылку:\n"
+            f"<code>{escape(socks5_link)}</code>"
         )
         try:
             await callback.message.edit_text(
                 text,
-                reply_markup=socks5_credentials_keyboard(),
+                reply_markup=socks5_credentials_keyboard(socks5_link),
                 parse_mode="HTML",
             )
         except Exception:
