@@ -611,102 +611,113 @@ ALTER TABLE nodes ADD COLUMN IF NOT EXISTS socks5_port INTEGER DEFAULT 1080;
 
 ---
 
-## Часть 5: Marzban (SOCKS5 прокси)
+## Часть 5: SOCKS5 прокси (3proxy)
 
-### 5.1. Marzban Panel (основной сервер)
+SOCKS5 реализован через легковесный 3proxy на каждой ноде, управляемый через node-agent.
 
-Marzban Panel устанавливается на основной сервер рядом с ботом.
+### 5.1. Установка 3proxy на ноде
 
-```bash
-# Установка через официальный скрипт
-sudo bash -c "$(curl -sL https://github.com/Gozargah/Marzban/raw/master/script.sh)" @ install
-```
-
-Панель будет доступна на порту `8000`. Задайте логин/пароль admin при первом входе.
-
-Добавить в `.env` бота:
-
-```
-MARZBAN_BASE_URL=http://localhost:8000
-MARZBAN_ADMIN_USERNAME=admin
-MARZBAN_ADMIN_PASSWORD=ваш_пароль_marzban
-```
-
-Перезапустить бот: `systemctl restart mtproxy-bot`
-
-### 5.2. Marzban Node (на каждой ноде с SOCKS5)
-
-На каждой ноде, где нужен SOCKS5:
+Повторяется для каждой ноды, где нужен SOCKS5.
 
 ```bash
-# Установка Marzban Node
-sudo bash -c "$(curl -sL https://github.com/Gozargah/Marzban-node/raw/master/script.sh)" @ install
+apt update && apt install -y 3proxy
 ```
 
-Получить TLS-сертификат ноды (на Marzban Panel):
-1. Зайти в Web UI панели: `https://ваш_домен.com:8000/dashboard`
-2. Settings → Nodes → Add New Node
-3. Скопировать сертификат ноды
-4. Указать IP и порт ноды (по умолчанию 62050)
-
-На ноде — вставить сертификат:
+### 5.2. Конфигурация 3proxy
 
 ```bash
-nano /var/lib/marzban-node/ssl_client_cert.pem
-# Вставить содержимое сертификата из панели
+mkdir -p /opt/3proxy
+touch /opt/3proxy/passwd
+
+cat > /opt/3proxy/3proxy.cfg << 'EOF'
+# 3proxy SOCKS5 config
+nscache 65536
+nserver 8.8.8.8
+nserver 1.1.1.1
+
+log /var/log/3proxy/3proxy.log D
+logformat "- +_L%t.%. %N.%p %E %C:%c %R:%r %O %I %h %T"
+rotate 7
+
+# Авторизация по логину/паролю из файла
+auth strong
+users $/opt/3proxy/passwd
+
+# SOCKS5 на порту 1080
+socks -p1080
+EOF
+
+mkdir -p /var/log/3proxy
 ```
 
-Перезапустить Marzban Node:
+### 5.3. Systemd-сервис для 3proxy
 
 ```bash
-systemctl restart marzban-node
+cat > /etc/systemd/system/3proxy.service << 'EOF'
+[Unit]
+Description=3proxy SOCKS5 Proxy
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/3proxy /opt/3proxy/3proxy.cfg
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+systemctl daemon-reload
+systemctl enable --now 3proxy
+systemctl status 3proxy
 ```
 
-### 5.3. Настройка SOCKS5 Inbound
-
-В Web UI Marzban Panel:
-1. Settings → Inbounds → Add Inbound
-2. Тип: **SOCKS**
-3. Tag: например `socks-de-1` (уникальный для каждой ноды)
-4. Listen: `0.0.0.0`
-5. Port: `1080` (или другой свободный)
-6. Привязать к нужной ноде
-
-### 5.4. Настройка Host
-
-В Web UI: Settings → Hosts → добавить host для SOCKS-inbound:
-- Remark: `{USERNAME}`
-- Address: `IP_НОДЫ`
-- Port: `1080`
-- Это нужно чтобы Marzban формировал ссылки с правильным IP
-
-### 5.5. Файрвол на ноде
+### 5.4. Файрвол на ноде
 
 ```bash
 # SOCKS5 порт — открыт всем
 ufw allow 1080/tcp
+```
 
-# Marzban Node API — ТОЛЬКО для основного сервера
-ufw allow from IP_ОСНОВНОГО_СЕРВЕРА to any port 62050
+### 5.5. Обновить node-agent
+
+На ноде — скопировать обновлённые файлы:
+
+```bash
+cd /opt/node_agent
+scp root@IP_ОСНОВНОГО:/opt/tg_mtproxy/node_agent/agent.py ./
+scp root@IP_ОСНОВНОГО:/opt/tg_mtproxy/node_agent/socks5_manager.py ./
+systemctl restart node-agent
 ```
 
 ### 5.6. Регистрация SOCKS5 на ноде в БД
 
+На основном сервере:
+
 ```bash
 docker compose exec postgres psql -U mtproxy -d mtproxy -c "
-UPDATE nodes
-SET socks5_inbound_tag = 'socks-de-1', socks5_port = 1080
-WHERE name = 'DE-1';
+UPDATE nodes SET socks5_port = 1080 WHERE name = 'DE-1';
 "
 ```
 
-После этого при покупке типа SOCKS5 бот будет создавать пользователей через Marzban API.
+Повторить для каждой ноды, меняя `name`.
 
 ### 5.7. Проверка
 
-В боте: «Купить прокси» → «SOCKS5 Proxy» → выбрать локацию → выбрать тариф → подтвердить.
+В боте: «Купить прокси» → «SOCKS5 Proxy» → выбрать локацию → тариф → подтвердить.
 
 Пользователь получит: хост, порт, логин, пароль.
+
+Проверка на ноде:
+
+```bash
+# Список пользователей
+cat /opt/3proxy/passwd
+
+# Тест подключения
+curl -x socks5://ЛОГИН:ПАРОЛЬ@IP_НОДЫ:1080 https://ifconfig.me
+```
 
 ---
 

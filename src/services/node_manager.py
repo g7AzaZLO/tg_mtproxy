@@ -104,6 +104,78 @@ class NodeManagerService:
             logger.exception("HTTP ошибка при удалении секрета с %s", agent_url)
             return False
 
+    async def add_socks5_user(
+        self,
+        *,
+        agent_url: str,
+        agent_api_key: str,
+        username: str,
+        password: str,
+    ) -> bool:
+        """Добавляет SOCKS5-пользователя на ноду через Node Agent API.
+
+        Args:
+            agent_url: Базовый URL агента.
+            agent_api_key: API-ключ для авторизации.
+            username: Логин SOCKS5.
+            password: Пароль SOCKS5.
+
+        Returns:
+            True при успешном добавлении, False при ошибке.
+        """
+        try:
+            async with self._make_client(agent_url, agent_api_key) as client:
+                response = await client.post(
+                    "/socks5/add",
+                    json={"username": username, "password": password},
+                )
+                if response.status_code == 200:
+                    logger.info("SOCKS5 user добавлен на ноду %s: %s", agent_url, username)
+                    return True
+                logger.error(
+                    "Ошибка добавления SOCKS5 user на %s: %d %s",
+                    agent_url, response.status_code, response.text,
+                )
+                return False
+        except httpx.HTTPError:
+            logger.exception("HTTP ошибка при добавлении SOCKS5 user на %s", agent_url)
+            return False
+
+    async def remove_socks5_user(
+        self,
+        *,
+        agent_url: str,
+        agent_api_key: str,
+        username: str,
+    ) -> bool:
+        """Удаляет SOCKS5-пользователя с ноды через Node Agent API.
+
+        Args:
+            agent_url: Базовый URL агента.
+            agent_api_key: API-ключ для авторизации.
+            username: Логин SOCKS5 для удаления.
+
+        Returns:
+            True при успешном удалении, False при ошибке.
+        """
+        try:
+            async with self._make_client(agent_url, agent_api_key) as client:
+                response = await client.post(
+                    "/socks5/remove",
+                    json={"username": username},
+                )
+                if response.status_code == 200:
+                    logger.info("SOCKS5 user удалён с ноды %s: %s", agent_url, username)
+                    return True
+                logger.error(
+                    "Ошибка удаления SOCKS5 user с %s: %d %s",
+                    agent_url, response.status_code, response.text,
+                )
+                return False
+        except httpx.HTTPError:
+            logger.exception("HTTP ошибка при удалении SOCKS5 user с %s", agent_url)
+            return False
+
     async def health_check(
         self,
         *,

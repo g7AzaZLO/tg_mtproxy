@@ -86,27 +86,6 @@ class JWTSettings(BaseSettings):
     expire_minutes: int = Field(default=1440, description="Время жизни токена в минутах (24ч)")
 
 
-class MarzbanSettings(BaseSettings):
-    """Настройки подключения к Marzban Panel API."""
-
-    model_config = SettingsConfigDict(
-        env_file=_ENV_FILE, env_prefix="MARZBAN_", extra="ignore"
-    )
-
-    base_url: str = Field(
-        default="http://localhost:8000",
-        description="URL Marzban Panel API",
-    )
-    admin_username: str = Field(
-        default="admin",
-        description="Логин администратора Marzban",
-    )
-    admin_password: str = Field(
-        default="",
-        description="Пароль администратора Marzban",
-    )
-
-
 class ServiceSettings(BaseSettings):
     """Настройки бизнес-логики сервиса."""
 
@@ -151,7 +130,6 @@ class Settings(BaseSettings):
     admin: AdminSettings = Field(default_factory=AdminSettings)
     jwt: JWTSettings = Field(default_factory=JWTSettings)
     service: ServiceSettings = Field(default_factory=ServiceSettings)
-    marzban: MarzbanSettings = Field(default_factory=MarzbanSettings)
 
 
 def get_settings() -> Settings:
